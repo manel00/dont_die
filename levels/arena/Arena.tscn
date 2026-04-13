@@ -1,0 +1,158 @@
+[gd_scene load_steps=10 format=3 uid="uid://be5e8u3v7k6m4"]
+
+[ext_resource type="Script" path="res://levels/arena/Arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://levels/arena/EnvironmentController.gd" id="2_env"]
+[ext_resource type="Script" path="res://levels/arena/CityPropsSpawner.gd" id="3_city"]
+[ext_resource type="PackedScene" path="res://ui/hud/HUD.tscn" id="4_hud"]
+[ext_resource type="PackedScene" path="res://entities/interactables/WeaponPickup.tscn" id="5_wep"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
+sky_top_color = Color(0.1, 0.15, 0.25, 1)
+sky_horizon_color = Color(0.05, 0.1, 0.15, 1)
+ground_bottom_color = Color(0.02, 0.05, 0.08, 1)
+ground_horizon_color = Color(0.05, 0.1, 0.15, 1)
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ProceduralSkyMaterial_1")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 3
+ambient_light_color = Color(0.3, 0.4, 0.5, 1)
+ambient_light_sky_contribution = 0.5
+tonemap_mode = 3
+tonemap_exposure = 1.1
+ssr_enabled = true
+ssao_enabled = true
+ssao_radius = 2.0
+ssao_intensity = 3.0
+ssil_enabled = true
+sdfgi_enabled = true
+sdfgi_use_occlusion = true
+sdfgi_read_sky_light = true
+glow_enabled = true
+glow_bloom = 0.3
+glow_blend_mode = 1
+fog_enabled = true
+fog_light_color = Color(0.2, 0.3, 0.4, 1)
+fog_density = 0.005
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.02
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(250, 2, 250)
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_1"]
+agent_height = 0.95
+agent_radius = 0.35
+agent_max_climb = 0.25
+agent_max_slope = 45.0
+
+[node name="Arena" type="Node3D"]
+script = ExtResource("1_arena")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." groups=["sun_light"]]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 15, 0)
+light_color = Color(0.8, 0.9, 1.0, 1)
+light_energy = 0.8
+shadow_enabled = true
+directional_shadow_mode = 1
+directional_shadow_blend_splits = true
+
+[node name="FloorStaticBody" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorStaticBody"]
+shape = SubResource("BoxShape3D_floor")
+
+[node name="EnvironmentController" type="Node3D" parent="." node_paths=PackedStringArray("environment_node", "sun_light")]
+script = ExtResource("2_env")
+environment_node = NodePath("../WorldEnvironment")
+sun_light = NodePath("../DirectionalLight3D")
+
+[node name="HUD" parent="." instance=ExtResource("4_hud")]
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." groups=["navigation_regions"]]
+navigation_mesh = SubResource("NavigationMesh_1")
+
+[node name="City" type="Node3D" parent="NavigationRegion3D"]
+script = ExtResource("3_city")
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://entities/player/Player.tscn")
+spawn_path = NodePath("../Players")
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://entities/enemies/zombie/Zombie.tscn", "res://entities/enemies/mage/Mage.tscn", "res://entities/enemies/boss/Boss.tscn", "res://entities/enemies/rogue/Rogue.tscn", "res://entities/enemies/minion/Minion.tscn")
+spawn_path = NodePath("../Enemies")
+
+[node name="Spawners" type="Node3D" parent="."]
+
+[node name="Spawner_N" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -48)
+
+[node name="Spawner_NE" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1, -40)
+
+[node name="Spawner_E" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 1, 0)
+
+[node name="Spawner_SE" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1, 40)
+
+[node name="Spawner_S" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 48)
+
+[node name="Spawner_SW" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1, 40)
+
+[node name="Spawner_W" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 1, 0)
+
+[node name="Spawner_NW" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1, -40)
+
+[node name="Spawner_Inner_N" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -20)
+
+[node name="Spawner_Inner_E" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1, 0)
+
+[node name="Spawner_Inner_S" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 20)
+
+[node name="Spawner_Inner_W" type="Marker3D" parent="Spawners" groups=["spawners"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 1, 0)
+
+[node name="PlayerSpawnMarkers" type="Node3D" parent="."]
+
+[node name="PlayerSpawn1" type="Marker3D" parent="PlayerSpawnMarkers" groups=["player_spawns"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="PlayerSpawn2" type="Marker3D" parent="PlayerSpawnMarkers" groups=["player_spawns"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 4)
+
+[node name="PlayerSpawn3" type="Marker3D" parent="PlayerSpawnMarkers" groups=["player_spawns"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, -4)
+
+[node name="WeaponPickups" type="Node3D" parent="."]
+
+[node name="WeaponPickup1" parent="WeaponPickups" instance=ExtResource("5_wep")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 5)
+
+[node name="WeaponPickup2" parent="WeaponPickups" instance=ExtResource("5_wep")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -5)
+
+[node name="WeaponPickup3" parent="WeaponPickups" instance=ExtResource("5_wep")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.5, 0)
+
+[node name="WeaponPickup4" parent="WeaponPickups" instance=ExtResource("5_wep")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.5, 0)

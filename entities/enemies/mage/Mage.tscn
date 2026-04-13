@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://entities/enemies/mage/Mage.gd" id="1_abc"]
+[ext_resource type="PackedScene" path="res://assets/models/characters/KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Mage.glb" id="2_abc"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+radius = 0.5
+height = 2.0
+
+[node name="Mage" type="CharacterBody3D" groups=["enemies"]]
+script = ExtResource("1_abc")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0)
+shape = SubResource("CapsuleShape3D_1")
+
+[node name="VisualModel" type="Node3D" parent="."]
+transform = Transform3D(1.32, 0, 0, 0, 1.32, 0, 0, 0, 1.32, 0, 0, 0)
+
+[node name="Skeleton_Mage" parent="VisualModel" instance=ExtResource("2_abc")]

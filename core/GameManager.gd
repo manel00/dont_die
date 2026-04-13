@@ -1,0 +1,55 @@
+extends Node
+
+## GameManager (Autoload)
+## Gestiona el estado global del juego (Puntos, Player, Game Over)
+
+signal score_changed(new_score)
+signal game_over
+
+var current_score: int = 0
+var is_game_over: bool = false
+var player: Node = null
+var solo_mode: bool = false  # true = single player + bots, false = LAN
+var selected_map_path: String = "res://levels/arena/Arena.tscn"
+
+const MAP_ARENA = "res://levels/arena/Arena.tscn"
+const MAP_SAGRERA = "res://levels/arena/LaSagrera.tscn"
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+func _process(_delta: float) -> void:
+	if is_game_over and Input.is_action_just_pressed("ui_accept"): # Enter key
+		restart_game()
+
+func add_score(amount: int) -> void:
+	if is_game_over: return
+	
+	current_score += amount
+	score_changed.emit(current_score)
+	print("Puntos: ", current_score)
+
+func register_player(player_node: Node) -> void:
+	player = player_node
+	player.add_to_group("player")
+
+func trigger_game_over() -> void:
+	if is_game_over: return
+	
+	is_game_over = true
+	game_over.emit()
+	print("GAME OVER! Puntuación final: ", current_score)
+	
+	# Pausar el juego (pero permitir que el GameManager procese el input de reinicio)
+	get_tree().paused = true
+
+func restart_game() -> void:
+	print("Reiniciando juego...")
+	get_tree().paused = false
+	is_game_over = false
+	current_score = 0
+	if solo_mode:
+		# Restart in solo mode: go back to menu (cleaner than reloading in-place)
+		get_tree().change_scene_to_file("res://ui/menu/MainMenu.tscn")
+	else:
+		get_tree().reload_current_scene()

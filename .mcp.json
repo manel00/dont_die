@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "godot-mcp-server-local": {
+      "command": "node",
+      "args": [
+        "./server/dist/index.js"
+      ],
+      "env": {
+        "GODOT_WS_URL": "ws://127.0.0.1:6505"
+      }
+    }
+  }
+}

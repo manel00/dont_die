@@ -1,0 +1,152 @@
+[gd_scene load_steps=2 format=3 uid="uid://mainmenu001"]
+
+[ext_resource type="Script" path="res://ui/menu/MainMenu.gd" id="1_menu"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.047, 0.063, 0.11, 1)
+
+[node name="BgGrad" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.025, 0.12, 0.5)
+
+[node name="MenuContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Card" type="PanelContainer" parent="MenuContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(500, 560)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MenuContainer/Card"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="TitleSection" type="VBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PreTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.4, 0.75, 1.0, 0.8)
+text = "█ BIOHAZARD NETWORK PROTOCOL v2.1"
+horizontal_alignment = 1
+
+[node name="Title" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.95, 0.95, 1.0, 1)
+text = "BIODEATH
+ARENA"
+horizontal_alignment = 1
+
+[node name="SubTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.35, 0.65, 0.95, 0.7)
+text = "SURVIVAL SHOOTER  |  SOLO + BOTS  |  LAN CO-OP"
+horizontal_alignment = 1
+
+[node name="Separator1" type="HSeparator" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="SoloButton" type="Button" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+text = "🎮  SOLO PLAY  (+ 2 AI ALLIES)"
+
+[node name="MapLabel" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+text = "SELECT DEPLOYMENT ZONE"
+horizontal_alignment = 1
+
+[node name="MapSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ArenaButton" type="Button" parent="MenuContainer/Card/VBoxContainer/MapSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "○ ARENA CLÁSICA"
+
+[node name="SagreraButton" type="Button" parent="MenuContainer/Card/VBoxContainer/MapSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "○ LA SAGRERA"
+
+[node name="Separator2" type="HSeparator" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="IPSection" type="VBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="IPLabel" type="Label" parent="MenuContainer/Card/VBoxContainer/IPSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+text = "LAN — SERVER IP ADDRESS"
+
+[node name="IpLineEdit" type="LineEdit" parent="MenuContainer/Card/VBoxContainer/IPSection"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
+placeholder_text = "127.0.0.1"
+alignment = 1
+
+[node name="ButtonSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HostButton" type="Button" parent="MenuContainer/Card/VBoxContainer/ButtonSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 52)
+text = "⚡  HOST LAN"
+
+[node name="JoinButton" type="Button" parent="MenuContainer/Card/VBoxContainer/ButtonSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 52)
+text = "🌐  JOIN LAN"
+
+[node name="StatusLabel" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.5, 0.8, 1.0, 1)
+text = "SELECT GAME MODE"
+horizontal_alignment = 1
+
+[node name="Footer" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.3, 0.4, 0.5, 0.5)
+text = "WASD move  |  Numpad shoot  |  LMB fire  |  1/2/3 weapons  |  SPACE magic  |  R reload"
+horizontal_alignment = 1

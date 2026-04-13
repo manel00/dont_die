@@ -1,0 +1,102 @@
+extends EnemyBase
+
+## Minion — usa Skeleton_Minion.glb (KayKit Skeletons)
+## Enemigo débil pero numeroso, ataca en grupo
+
+var _anim_player: AnimationPlayer = null
+const ANIM_WALK := "Walk"
+const ANIM_IDLE := "Idle"
+const ANIM_ATTACK := "Attack"
+
+func _ready() -> void:
+	super._ready()
+	attack_range = 1.5
+	move_speed = 4.0  # Rápido pero no tanto como Rogue
+	attack_damage = 8  # Daño bajo
+	max_health = 80   # Más resistente
+	current_health = 80
+	score_value = 5   # Pocos puntos
+	_find_anim_player()
+	_setup_visual()
+
+func _setup_visual() -> void:
+	var visual := get_node_or_null("VisualModel")
+	if not visual: return
+	# El minion es más pequeño
+	visual.scale = Vector3(0.35, 0.35, 0.35)
+
+func _find_anim_player() -> void:
+	var visual := get_node_or_null("VisualModel")
+	if not visual: return
+	for child in visual.get_children():
+		if child is AnimationPlayer:
+			_anim_player = child
+			_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb")
+			return
+		for grandchild in child.get_children():
+			if grandchild is AnimationPlayer:
+				_anim_player = grandchild
+				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb")
+				return
+
+func _load_animations(anim_path: String) -> void:
+	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
+	pass
+
+func _physics_process(delta: float) -> void:
+	super._physics_process(delta)
+	_update_animation()
+
+func _update_animation() -> void:
+	if not _anim_player:
+		return
+	match current_state:
+		State.IDLE:
+			if _anim_player.has_animation(ANIM_IDLE) and _anim_player.current_animation != ANIM_IDLE:
+				_anim_player.play(ANIM_IDLE)
+		State.CHASE:
+			if _anim_player.has_animation(ANIM_WALK) and _anim_player.current_animation != ANIM_WALK:
+				_anim_player.play(ANIM_WALK)
+				# Animación más rápida para el minion
+				_anim_player.speed_scale = 1.5
+		State.ATTACK:
+			if _anim_player.has_animation(ANIM_ATTACK) and _anim_player.current_animation != ANIM_ATTACK:
+				_anim_player.play(ANIM_ATTACK)
+		State.DEAD:
+			_anim_player.stop()
+
+func _perform_attack() -> void:
+	if target == null: return
+	
+	var dir := global_position.direction_to(target.global_position)
+	var move_dir := Vector3(dir.x, 0, dir.z).normalized()
+	rotation.y = atan2(move_dir.x, move_dir.z)
+	
+	# Daño en área muy corto alcance
+	if multiplayer.is_server():
+		var enemies = get_tree().get_nodes_in_group("player")
+		for e in enemies:
+			if is_instance_valid(e) and e.global_position.distance_to(global_position) < attack_range:
+				if e.has_method("take_damage"): 
+					e.take_damage(attack_damage)
+
+func die() -> void:
+	# Override para añadir efecto de muerte de minion (explosión pequeña)
+	_death_effect()
+	super.die()
+
+func _death_effect() -> void:
+	var burst = CSGSphere3D.new()
+	burst.radius = 0.2
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.9, 0.3, 0.1)
+	mat.emission_enabled = true
+	mat.emission = Color(0.8, 0.2, 0.0)
+	burst.material = mat
+	get_tree().current_scene.add_child(burst)
+	burst.global_position = global_position + Vector3(0, 0.3, 0)
+	
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(burst, "scale", Vector3(3, 3, 3), 0.2)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.2)
+	tw.chain().tween_callback(burst.queue_free)

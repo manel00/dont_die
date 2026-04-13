@@ -1,0 +1,93 @@
+# ========================================= #
+# Entorno y Variables (Seguridad)           #
+# ========================================= #
+.env
+.env.*
+!.env.example
+!.env.test
+
+# ========================================= #
+# Godot Engine                              #
+# ========================================= #
+.godot/
+.import/
+export/
+exports/
+export_credentials.cfg
+
+# Godot Mono / C# (Opcional)
+.mono/
+data_*/
+mono_crash.*.json
+obj/
+*.csproj.user
+
+# ========================================= #
+# Node.js / Dependencias                    #
+# ========================================= #
+node_modules/
+.pnpm-store/
+
+# ========================================= #
+# TypeScript / Compilación                  #
+# ========================================= #
+dist/
+out/
+build/
+*.tsbuildinfo
+
+# ========================================= #
+# Logs y Testing                            #
+# ========================================= #
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+coverage/
+.nyc_output/
+
+# ========================================= #
+# Editores de Código (VS Code, IntelliJ)    #
+# ========================================= #
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Ignorar todo de VS Code EXCEPTO la configuración del proyecto compartida
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+
+# ========================================= #
+# Sistema Operativo (OS)                    #
+# ========================================= #
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+desktop.ini
+
+# Linux
+*~
+.directory
+
+assets/
+server/
