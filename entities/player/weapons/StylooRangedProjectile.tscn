@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://dec4cg1rfqiyy"]
+
+[ext_resource type="Script" path="res://entities/player/weapons/StylooRangedProjectile.gd" id="1_stylooproj"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_1"]
+radius = 0.25
+
+[node name="StylooRangedProjectile" type="Area3D"]
+collision_layer = 0
+collision_mask = 3
+script = ExtResource("1_stylooproj")
+speed = 35.0
+damage = 25
+weapon_type = "shuriken1"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_1")

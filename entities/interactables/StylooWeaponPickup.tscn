@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://4phupfu8yd0k"]
+
+[ext_resource type="Script" path="res://entities/interactables/StylooWeaponPickup.gd" id="1_styloo"]
+
+[node name="StylooWeaponPickup" type="Area3D"]
+script = ExtResource("1_styloo")
+weapon_type = "katana"

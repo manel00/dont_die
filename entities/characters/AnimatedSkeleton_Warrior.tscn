@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://animwarrior001"]
+[gd_scene load_steps=4 format=3 uid="uid://animwarrior001"]
 
 [ext_resource type="PackedScene" path="res://assets/models/characters/KayKit_Skeletons_1.1_FREE/characters/gltf/Skeleton_Warrior.glb" id="1_model"]
-[ext_resource type="PackedScene" path="res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb" id="2_anims"]
+[ext_resource type="Script" path="res://core/AnimationController.gd" id="2_controller"]
+
+[sub_resource type="AnimationNodeStateMachine" id="state_machine"]
 
 [node name="AnimatedSkeleton_Warrior" type="Node3D"]
 
@@ -9,3 +11,11 @@
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 root_node = NodePath("Skeleton_Warrior")
+
+[node name="AnimationController" type="Node" parent="."]
+script = ExtResource("2_controller")
+
+[node name="AnimationTree" type="AnimationTree" parent="AnimationController"]
+tree_root = SubResource("state_machine")
+anim_player = NodePath("../../AnimationPlayer")
+active = true

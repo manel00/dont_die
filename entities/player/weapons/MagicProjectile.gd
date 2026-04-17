@@ -2,7 +2,7 @@ class_name MagicProjectile
 extends Area3D
 
 @export var speed: float = 30.0
-@export var impact_damage: float = 100.0
+@export var impact_damage: float = 15.0
 @export var explosion_radius: float = 4.0
 @export var hit_group: String = "enemies"
 
@@ -25,19 +25,17 @@ func _physics_process(delta: float) -> void:
 	global_position += direction * speed * delta
 
 func _on_body_entered(body: Node3D) -> void:
-	# FIX: Solo explotar si golpea un CharacterBody3D (jugadores/enemigos/barrels), no entorno
-	if not (body is CharacterBody3D or body is StaticBody3D and body.has_method("take_damage")):
-		# Si es entorno estático sin take_damage, ignorar y continuar
-		if body is StaticBody3D and not body.has_method("take_damage"):
-			return
-	
-	print("MAGIC EXPLOSION!")
+	if not (body is CharacterBody3D or (body is StaticBody3D and body.has_method("take_damage"))):
+		return
 	
 	# Daño en área a todos los targets del grupo correcto en radio
 	var targets := get_tree().get_nodes_in_group(hit_group)
+	print("DEBUG MagicProjectile: checking ", targets.size(), " targets in group '", hit_group, "'")
 	for t in targets:
 		if is_instance_valid(t) and t.global_position.distance_to(global_position) <= explosion_radius:
 			if t.has_method("take_damage"):
+				var dist = t.global_position.distance_to(global_position)
+				print("DEBUG MagicProjectile: HIT target=", t.name, " dist=", dist, " damage=", impact_damage)
 				t.take_damage(int(impact_damage))
 				
 	# Efecto visual de explosión

@@ -25,17 +25,23 @@ fog_enabled = true
 fog_light_color = Color(0.2, 0.3, 0.4, 1)
 fog_density = 0.005
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_Road"]
-size = Vector2(1, 1)
+[sub_resource type="BoxMesh" id="BoxMesh_Road"]
+size = Vector3(1, 0.2, 1)
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_Sidewalk"]
-size = Vector2(1, 1)
+[sub_resource type="BoxMesh" id="BoxMesh_Sidewalk"]
+size = Vector3(1, 0.25, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_Ground"]
+size = Vector3(1, 0.5, 1)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_Street"]
-size = Vector3(1, 0.1, 1)
+size = Vector3(1, 0.2, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_Ground"]
+size = Vector3(1, 0.5, 1)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_LaSagrera"]
-vertices = PackedVector3Array(-60, 0, -60, -60, 0, 80, 80, 0, 80, 80, 0, -60)
+vertices = PackedVector3Array(-60, 0, -60, -60, 0, 60, 60, 0, 60, 60, 0, -60)
 polygons = [PackedInt32Array(0, 1, 2), PackedInt32Array(0, 2, 3)]
 agent_height = 0.95
 agent_radius = 0.35
@@ -58,93 +64,91 @@ sun_light = NodePath("../DirectionalLight3D")
 
 [node name="HUD" parent="." instance=ExtResource("3_hud")]
 
+[node name="Ground" type="StaticBody3D" parent="."]
+transform = Transform3D(120, 0, 0, 0, 1, 0, 0, 0, 120, 0, -0.25, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("BoxMesh_Ground")
+surface_material_override/0 = ExtResource("5_sidewalk")
+
+[node name="Collision" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("BoxShape3D_Ground")
+
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." groups=["navigation_regions"]]
 navigation_mesh = SubResource("NavigationMesh_LaSagrera")
 
 [node name="StreetLayout" type="Node3D" parent="NavigationRegion3D"]
 
-[node name="Street_Meridiana" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
+[node name="Meridiana" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
+transform = Transform3D(0.956, 0, -0.293, 0, 1, 0, 0.293, 0, 0.956, 0, 0, 0)
 
-[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana"]
-transform = Transform3D(40, 0, 0, 0, 1, 0, 0, 0, 160, 0, 0, 0)
+[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Meridiana"]
+transform = Transform3D(45, 0, 0, 0, 1, 0, 0, 0, 120, 0, 0.1, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana/Road"]
-mesh = SubResource("PlaneMesh_Road")
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Meridiana/Road"]
+mesh = SubResource("BoxMesh_Road")
 surface_material_override/0 = ExtResource("4_road")
 
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana/Road"]
+[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Meridiana/Road"]
 shape = SubResource("BoxShape3D_Street")
 
-[node name="Sidewalk_L" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana"]
-transform = Transform3D(2.5, 0, 0, 0, 1, 0, 0, 0, 160, -21.25, 0.15, 0)
+[node name="Sidewalk_West" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Meridiana"]
+transform = Transform3D(4, 0, 0, 0, 1, 0, 0, 0, 120, -24.5, 0.125, 0)
 
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana/Sidewalk_L"]
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Meridiana/Sidewalk_West"]
+mesh = SubResource("BoxMesh_Sidewalk")
+surface_material_override/0 = ExtResource("5_sidewalk")
+
+[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Meridiana/Sidewalk_West"]
+shape = SubResource("BoxShape3D_Street")
+
+[node name="Sidewalk_East" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Meridiana"]
+transform = Transform3D(4, 0, 0, 0, 1, 0, 0, 0, 120, 24.5, 0.125, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Meridiana/Sidewalk_East"]
+mesh = SubResource("BoxMesh_Sidewalk")
+surface_material_override/0 = ExtResource("5_sidewalk")
+
+[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Meridiana/Sidewalk_East"]
+shape = SubResource("BoxShape3D_Street")
+
+[node name="Street_FelipII" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, 0)
+
+[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_FelipII"]
+transform = Transform3D(12, 0, 0, 0, 1, 0, 0, 0, 80, 0, 0.1, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_FelipII/Road"]
+mesh = SubResource("BoxMesh_Road")
+surface_material_override/0 = ExtResource("4_road")
+
+[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_FelipII/Road"]
+shape = SubResource("BoxShape3D_Street")
+
+[node name="Street_Garcilaso" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 0)
+
+[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_Garcilaso"]
+transform = Transform3D(12, 0, 0, 0, 1, 0, 0, 0, 80, 0, 0.1, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_Garcilaso/Road"]
+mesh = SubResource("BoxMesh_Road")
+surface_material_override/0 = ExtResource("4_road")
+
+[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_Garcilaso/Road"]
+shape = SubResource("BoxShape3D_Street")
+
+[node name="Park_North" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+
+[node name="Ground" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Park_North"]
+transform = Transform3D(40, 0, 0, 0, 1, 0, 0, 0, 30, 0, 0, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Park_North/Ground"]
 mesh = SubResource("PlaneMesh_Sidewalk")
 surface_material_override/0 = ExtResource("5_sidewalk")
 
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana/Sidewalk_L"]
-shape = SubResource("BoxShape3D_Street")
-
-[node name="Sidewalk_R" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana"]
-transform = Transform3D(2.5, 0, 0, 0, 1, 0, 0, 0, 160, 21.25, 0.15, 0)
-
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana/Sidewalk_R"]
-mesh = SubResource("PlaneMesh_Sidewalk")
-surface_material_override/0 = ExtResource("5_sidewalk")
-
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_Meridiana/Sidewalk_R"]
-shape = SubResource("BoxShape3D_Street")
-
-[node name="Street_FerranJunoy" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
-transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 40, 0, -20)
-
-[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_FerranJunoy"]
-transform = Transform3D(12, 0, 0, 0, 1, 0, 0, 0, 80, 0, 0, 0)
-
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_FerranJunoy/Road"]
-mesh = SubResource("PlaneMesh_Road")
-surface_material_override/0 = ExtResource("4_road")
-
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_FerranJunoy/Road"]
-shape = SubResource("BoxShape3D_Street")
-
-[node name="Street_ConcepcioArenal" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 10)
-
-[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_ConcepcioArenal"]
-transform = Transform3D(8, 0, 0, 0, 1, 0, 0, 0, 100, 0, 0, 0)
-
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_ConcepcioArenal/Road"]
-mesh = SubResource("PlaneMesh_Road")
-surface_material_override/0 = ExtResource("4_road")
-
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_ConcepcioArenal/Road"]
-shape = SubResource("BoxShape3D_Street")
-
-[node name="Street_DelSegre" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
-transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 40, 0, 40)
-
-[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_DelSegre"]
-transform = Transform3D(8, 0, 0, 0, 1, 0, 0, 0, 80, 0, 0, 0)
-
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_DelSegre/Road"]
-mesh = SubResource("PlaneMesh_Road")
-surface_material_override/0 = ExtResource("4_road")
-
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_DelSegre/Road"]
-shape = SubResource("BoxShape3D_Street")
-
-[node name="Street_MartiMolins" type="Node3D" parent="NavigationRegion3D/StreetLayout"]
-transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 40, 0, 70)
-
-[node name="Road" type="StaticBody3D" parent="NavigationRegion3D/StreetLayout/Street_MartiMolins"]
-transform = Transform3D(8, 0, 0, 0, 1, 0, 0, 0, 80, 0, 0, 0)
-
-[node name="Mesh" type="MeshInstance3D" parent="NavigationRegion3D/StreetLayout/Street_MartiMolins/Road"]
-mesh = SubResource("PlaneMesh_Road")
-surface_material_override/0 = ExtResource("4_road")
-
-[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Street_MartiMolins/Road"]
+[node name="Collision" type="CollisionShape3D" parent="NavigationRegion3D/StreetLayout/Park_North/Ground"]
 shape = SubResource("BoxShape3D_Street")
 
 [node name="Players" type="Node3D" parent="."]

@@ -11,7 +11,7 @@ The player has 4 main abilities triggered with keyboard keys:
 *   **0 (Q / KEY_0): Katana Melee** - A quick close-range swing that deals high damage to enemies in front. (Cooldown: 0.5s)
 *   **1 (KEY_1): Fireball** - Direct fire explosive projectile. Deals AOE damage on impact. (Cooldown: 2.0s)
 *   **2 (KEY_2): AOE Explosion** - A powerful explosion centered on the player that pushes and damages nearby zombies. (Cooldown: 5.0s)
-*   **3 (KEY_3 / Left Click): Weapon Shot** - Shoot rapid-fire projectiles in the direction you look. **Requires picking up a "Weapon" drop from enemies first.**
+*   **3 (KEY_3): Weapon Shot** - Shoot rapid-fire projectiles in the direction you look. **Requires picking up a "Weapon" drop from enemies first.**
 
 ## Environment
 The game takes place in a fixed city layout with roads, buildings, and street props. All buildings and props have static collisions.

@@ -531,7 +531,7 @@ func _cmd_edit_script(p: Dictionary) -> Dictionary:
 	elif p.has("insert_after"):
 		var after := String(p.insert_after)
 		var code := String(p.get("code", ""))
-		var idx := content.find(after)
+		var idx: int = content.find(after)
 		if idx >= 0:
 			content = content.insert(idx + after.length(), "\n" + code)
 	else:
@@ -596,10 +596,10 @@ func _cmd_search_in_files(p: Dictionary) -> Dictionary:
 		var text := _read_text(fp)
 		if text == null:
 			continue
-		var lower := text.to_lower()
+		var lower: String = text.to_lower()
 		if lower.contains(query):
 			# Find line numbers
-			var lines := text.split("\n")
+			var lines: Array = text.split("\n")
 			var line_matches: Array[Dictionary] = []
 			for i in range(lines.size()):
 				if lines[i].to_lower().contains(query):

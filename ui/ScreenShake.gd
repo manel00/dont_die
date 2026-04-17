@@ -8,12 +8,15 @@ var _original_position: Vector3 = Vector3.ZERO
 var _shake_intensity: float = 0.0
 var _shake_duration: float = 0.0
 var _is_shaking: bool = false
+var _camera_searched: bool = false
 
 func _ready() -> void:
-	# Encontrar la cámara del jugador
 	_find_camera()
 
 func _find_camera() -> void:
+	if _camera_searched and _camera: return
+	_camera_searched = true
+	
 	var players = get_tree().get_nodes_in_group("player")
 	for p in players:
 		if not p.is_in_group("bots"):

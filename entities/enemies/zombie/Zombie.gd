@@ -29,7 +29,7 @@ func _find_anim_player() -> void:
 				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb")
 				return
 
-func _load_animations(anim_path: String) -> void:
+func _load_animations(_anim_path := "") -> void:
 	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
 	pass
 

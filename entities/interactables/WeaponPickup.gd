@@ -5,11 +5,22 @@ extends Area3D
 ##
 ## Added support for weapon type, larger collision radius, and improved visuals.
 ##
-@export var weapon_type: String = "sword"  # Type of weapon this pickup provides
+@export var weapon_type: String = "sword"  # sword, shotgun, rifle
+
+var weapon_scene: PackedScene
 
 func _ready() -> void:
 	collision_mask = 1 # Players
 	body_entered.connect(_on_body_entered)
+	
+	# Load weapon scene based on type
+	match weapon_type:
+		"shotgun":
+			weapon_scene = preload("res://entities/player/weapons/Shotgun.tscn")
+		"rifle":
+			weapon_scene = preload("res://entities/player/weapons/Weapon.tscn")
+		_:
+			weapon_scene = preload("res://entities/player/weapons/Weapon.tscn")
 	
 	# Rotate and bob for visual effect
 	var tw = create_tween().set_loops().set_parallel(true)
@@ -118,7 +129,7 @@ func _setup_collision() -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if not multiplayer.is_server(): return
 	if body.is_in_group("player") and body.has_method("pickup_weapon"):
-		body.pickup_weapon()
+		body.pickup_weapon(weapon_type)
 		rpc_destroy.rpc()
 
 @rpc("authority", "call_local")

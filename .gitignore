@@ -90,4 +90,11 @@ desktop.ini
 .directory
 
 assets/
-server/
+
+# Server MCP - permitir acceso para edición de catálogo de herramientas
+!server/
+!server/src/
+!server/src/**
+!server/dist/
+!server/dist/**
+server/node_modules/

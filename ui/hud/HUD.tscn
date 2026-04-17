@@ -10,20 +10,18 @@ corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_bg"]
-bg_color = Color(0.15, 0.15, 0.15, 0.9)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+bg_color = Color(0.2, 0.2, 0.2, 0.8)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_fill"]
 bg_color = Color(0.9, 0.2, 0.2, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-shadow_color = Color(0.5, 0, 0, 0.6)
-shadow_size = 6
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [sub_resource type="LabelSettings" id="LabelSettings_radar"]
 font_size = 12
@@ -75,18 +73,18 @@ mouse_filter = 2
 
 [node name="HealthContainer" type="HBoxContainer" parent="MarginContainer/UILayout/BottomUI"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 size_flags_vertical = 4
 
 [node name="HeartIcon" type="Label" parent="MarginContainer/UILayout/BottomUI/HealthContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 24
 text = "❤️"
 
 [node name="HealthBar" type="ProgressBar" parent="MarginContainer/UILayout/BottomUI/HealthContainer"]
-custom_minimum_size = Vector2(400, 32)
+custom_minimum_size = Vector2(200, 16)
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 0
 size_flags_vertical = 4
 value = 100.0
 show_percentage = false
@@ -95,10 +93,10 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_health_fill")
 
 [node name="HealthValue" type="Label" parent="MarginContainer/UILayout/BottomUI/HealthContainer"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 18
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 4
+theme_override_constants/outline_size = 2
 text = "100/100"
 
 [node name="AmmoContainer" type="HBoxContainer" parent="MarginContainer/UILayout/BottomUI"]
@@ -117,6 +115,102 @@ layout_mode = 2
 size_flags_horizontal = 0
 theme_override_styles/fill = SubResource("StyleBoxFlat_1")
 show_percentage = false
+
+[node name="AbilitiesContainer" type="HBoxContainer" parent="MarginContainer/UILayout/BottomUI"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AbilityKatana" type="VBoxContainer" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer"]
+custom_minimum_size = Vector2(50, 60)
+layout_mode = 2
+
+[node name="Icon" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityKatana"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "⚔️"
+horizontal_alignment = 1
+
+[node name="CooldownOverlay" type="ProgressBar" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityKatana"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 3
+value = 100.0
+show_percentage = false
+
+[node name="KeyLabel" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityKatana"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Q"
+horizontal_alignment = 1
+
+[node name="AbilityFireball" type="VBoxContainer" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer"]
+custom_minimum_size = Vector2(50, 60)
+layout_mode = 2
+
+[node name="Icon" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityFireball"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "🔥"
+horizontal_alignment = 1
+
+[node name="CooldownOverlay" type="ProgressBar" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityFireball"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 3
+value = 100.0
+show_percentage = false
+
+[node name="KeyLabel" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityFireball"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "1"
+horizontal_alignment = 1
+
+[node name="AbilityExplosion" type="VBoxContainer" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer"]
+custom_minimum_size = Vector2(50, 60)
+layout_mode = 2
+
+[node name="Icon" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityExplosion"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "💥"
+horizontal_alignment = 1
+
+[node name="CooldownOverlay" type="ProgressBar" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityExplosion"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 3
+value = 100.0
+show_percentage = false
+
+[node name="KeyLabel" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityExplosion"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "2"
+horizontal_alignment = 1
+
+[node name="AbilityHeal" type="VBoxContainer" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer"]
+custom_minimum_size = Vector2(50, 60)
+layout_mode = 2
+
+[node name="Icon" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityHeal"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "❤️"
+horizontal_alignment = 1
+
+[node name="CooldownOverlay" type="ProgressBar" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityHeal"]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_vertical = 3
+value = 100.0
+show_percentage = false
+
+[node name="KeyLabel" type="Label" parent="MarginContainer/UILayout/BottomUI/AbilitiesContainer/AbilityHeal"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "H"
+horizontal_alignment = 1
 
 [node name="DamageOverlay" type="ColorRect" parent="."]
 visible = false
@@ -179,6 +273,7 @@ offset_right = -10.0
 offset_bottom = -10.0
 grow_horizontal = 0
 grow_vertical = 0
+rotation = 3.1416
 
 [node name="RadarBackground" type="ColorRect" parent="RadarContainer"]
 layout_mode = 1
@@ -227,16 +322,3 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="RadarLabel" type="Label" parent="RadarContainer"]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -40.0
-offset_top = -20.0
-offset_right = 40.0
-offset_bottom = -2.0
-grow_horizontal = 2
-text = "RADAR"
-label_settings = SubResource("LabelSettings_radar")
-horizontal_alignment = 1

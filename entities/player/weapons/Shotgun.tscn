@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://entities/player/weapons/Weapon.gd" id="1_shotgun"]
+[ext_resource type="PackedScene" path="res://entities/player/weapons/Projectile.tscn" id="2_shotgun"]
+
+[node name="Shotgun" type="Node3D"]
+script = ExtResource("1_shotgun")
+projectile_scene = ExtResource("2_shotgun")
+fire_rate = 0.8
+max_ammo = 8
+bullets_per_shot = 6
+spread_angle = 30.0
+normal_reload_time = 2.5
+active_reload_window_start = 1.0
+active_reload_window_end = 1.8
+jam_penalty_time = 1.5

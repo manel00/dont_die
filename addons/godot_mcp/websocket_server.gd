@@ -85,9 +85,9 @@ func _handle_request(client: WebSocketPeer, raw_text: String) -> void:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
 
-	var id := parsed.get("id", null)
+	var id: Variant = parsed.get("id", null)
 	var command := String(parsed.get("method", parsed.get("command", "")))
-	var payload := parsed.get("params", parsed.get("payload", {}))
+	var payload: Variant = parsed.get("params", parsed.get("payload", {}))
 	if typeof(payload) != TYPE_DICTIONARY:
 		payload = {}
 
@@ -99,7 +99,7 @@ func _handle_request(client: WebSocketPeer, raw_text: String) -> void:
 		_send_error(client, id, -32050, "Command router unavailable", "Re-enable plugin")
 		return
 
-	var execution := command_router.execute(command, payload)
+	var execution: Dictionary = command_router.execute(command, payload)
 	if execution.has("error"):
 		var err_obj: Dictionary = execution.error
 		_send_error(

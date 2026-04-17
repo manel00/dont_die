@@ -13,9 +13,13 @@ const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
 	super._ready()
-	attack_range = 15.0
-	move_speed = 4.5  # Faster than base zombies
-	score_value = 40
+	attack_range = 18.0  # Mayor rango
+	move_speed = 1.4  # 80% más lento
+	max_health = 180  # +50% más vida
+	current_health = max_health
+	attack_damage = 30  # +100% más daño
+	score_value = 60  # +50% más puntos
+	attack_cooldown = 1.4  # Ataques más frecuentes
 	_find_anim_player()
 	
 	# Attach Crossbow to hand (procedural for now, or just ensure it's in the scene)
@@ -49,7 +53,7 @@ func _find_anim_player() -> void:
 				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb")
 				return
 
-func _load_animations(anim_path: String) -> void:
+func _load_animations(_anim_path := "") -> void:
 	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
 	pass
 

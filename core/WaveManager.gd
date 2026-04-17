@@ -12,14 +12,17 @@ var mage_scene: PackedScene = preload("res://entities/enemies/mage/Mage.tscn")
 var rogue_scene: PackedScene = preload("res://entities/enemies/rogue/Rogue.tscn")
 
 # ═══════════════════════════════════════════════════════════════════
-#  WAVE CONFIGURATION - BALANCED: 1 miniboss cada 8 minions
+#  WAVE CONFIGURATION - 6 WAVES (triplicadas)
 # ═══════════════════════════════════════════════════════════════════
 const WAVE_CONFIG = {
-	1: {"total": 50, "minions": 44, "minibosses": 6},   # 44 + 6 = 50 (ratio 1:7.3)
-	2: {"total": 100, "minions": 89, "minibosses": 11}, # 89 + 11 = 100 (ratio 1:8.1)
-	3: {"total": 150, "minions": 133, "minibosses": 17} # 133 + 17 = 150 (ratio 1:7.8)
+	1: {"total": 50, "minions": 44, "minibosses": 6},    # 44 + 6 = 50
+	2: {"total": 100, "minions": 89, "minibosses": 11},  # 89 + 11 = 100
+	3: {"total": 150, "minions": 133, "minibosses": 17}, # 133 + 17 = 150
+	# Oleadas adicionales (triplicadas)
+	4: {"total": 200, "minions": 175, "minibosses": 25}, # Escalada progresiva
+	5: {"total": 275, "minions": 240, "minibosses": 35},
+	6: {"total": 375, "minions": 325, "minibosses": 50}  # Oleada final masiva
 }
-# Ratio: ~1 mini-boss por cada 8 minions (menos caótico, minibosses más especiales)
 
 # ═══════════════════════════════════════════════════════════════════
 #  STATE
@@ -40,27 +43,23 @@ var _total_wave_enemies: int = 0
 var spawn_timer: Timer
 var _spawn_batch_timer: Timer
 
+# OPTIMIZATION: Límite de enemigos activos para evitar lag
+# ═══════════════════════════════════════════════════════════════════
+const MAX_ACTIVE_ENEMIES: int = 50  # Máximo enemigos activos a la vez
+
 # ═══════════════════════════════════════════════════════════════════
 #  INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════
 func _ready() -> void:
-	print("╔══════════════════════════════════════════════════════════════╗")
-	print("║           WAVE MANAGER - SKELETON HORDE SYSTEM               ║")
-	print("╠══════════════════════════════════════════════════════════════╣")
-	print("║  Wave 1: 25 enemies  (21 Minions + 4 Mini-bosses)             ║")
-	print("║  Wave 2: 50 enemies (42 Minions + 8 Mini-bosses)             ║")
-	print("║  Wave 3: 75 enemies (63 Minions + 12 Mini-bosses)            ║")
-	print("╚══════════════════════════════════════════════════════════════╝")
-	
 	# Main spawn timer - OPTIMIZED: slower spawn to prevent lag
 	spawn_timer = Timer.new()
-	spawn_timer.wait_time = 0.5  # Spawn 2 enemies per second max
+	spawn_timer.wait_time = 0.4
 	spawn_timer.timeout.connect(_on_spawn_tick)
 	add_child(spawn_timer)
 	
 	# Batch spawn timer for initial wave burst
 	_spawn_batch_timer = Timer.new()
-	_spawn_batch_timer.wait_time = 0.2  # Slower batch spawn
+	_spawn_batch_timer.wait_time = 0.15
 	_spawn_batch_timer.timeout.connect(_on_batch_spawn)
 	add_child(_spawn_batch_timer)
 	
@@ -75,8 +74,7 @@ func _start_wave_1() -> void:
 	_start_wave(1)
 
 func _start_wave(wave_number: int) -> void:
-	if wave_number > 3:
-		print("WaveManager: ALL WAVES COMPLETED!")
+	if wave_number > 6:
 		return
 	
 	current_wave = wave_number
@@ -91,20 +89,14 @@ func _start_wave(wave_number: int) -> void:
 	
 	spawn_points = get_tree().get_nodes_in_group("spawners")
 	if spawn_points.is_empty():
-		print("WaveManager: ERROR - No spawners found! Creating fallback...")
 		_create_fallback_spawners()
-	
-	print("╔══════════════════════════════════════════════════════════════╗")
-	print("║  WAVE ", wave_number, " STARTED!                              ")
-	print("║  Minions to spawn: ", _minions_to_spawn, "                      ")
-	print("║  Mini-bosses to spawn: ", _minibosses_to_spawn, "                ")
-	print("╚══════════════════════════════════════════════════════════════╝")
 	
 	is_spawning = true
 	_wave_in_progress = true
 	
-	# Spawn initial batch immediately
-	_spawn_batch(10)
+	# Spawn initial batch - limitado para evitar lag en oleadas grandes
+	var batch_size = min(10, _total_wave_enemies / 10)
+	_spawn_batch(batch_size)
 	
 	# Start continuous spawning
 	spawn_timer.start()
@@ -164,6 +156,9 @@ func _can_spawn() -> bool:
 		return false
 	if _enemies_spawned_this_wave >= _total_wave_enemies:
 		return false
+	# OPTIMIZATION: No spawn si hay demasiados enemigos activos
+	if active_enemies >= MAX_ACTIVE_ENEMIES:
+		return false
 	return true
 
 func _spawn_single_enemy() -> void:
@@ -202,10 +197,9 @@ func _spawn_single_enemy() -> void:
 	
 	_enemies_spawned_this_wave += 1
 	
-	# Emit progress signal every 10 enemies
-	if _enemies_spawned_this_wave % 10 == 0:
+	# Emit progress signal every 20 enemies (reducido para menos logging)
+	if _enemies_spawned_this_wave % 20 == 0:
 		wave_enemy_spawned.emit(current_wave, _enemies_spawned_this_wave, _total_wave_enemies)
-		print("Wave ", current_wave, " Progress: ", _enemies_spawned_this_wave, "/", _total_wave_enemies, " (Active: ", active_enemies, ")")
 
 func _spawn_enemy_near_player(scene: PackedScene, is_miniboss: bool = false) -> void:
 	var players = get_tree().get_nodes_in_group("player")
@@ -219,13 +213,11 @@ func _spawn_enemy_near_player(scene: PackedScene, is_miniboss: bool = false) -> 
 	if human_players.size() > 0:
 		var target_player = human_players[randi() % human_players.size()]
 		var angle = randf() * TAU
-		# Minibosses spawn slightly farther away
 		var min_dist = 8.0 if is_miniboss else 4.0
 		var max_dist = 20.0 if is_miniboss else 12.0
 		var dist = lerp(min_dist, max_dist, randf())
 		spawn_pos = target_player.global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)
 	else:
-		# Fallback spawn positions
 		spawn_pos = Vector3(randf_range(-30, 30), 0, randf_range(-30, 30))
 	
 	_spawn_at_pos(scene, spawn_pos)
@@ -235,22 +227,26 @@ func _spawn_at_pos(scene: PackedScene, pos: Vector3) -> void:
 		return
 	
 	var enemy = scene.instantiate()
-	var enemies_node = get_tree().current_scene.get_node_or_null("Enemies")
+	var enemies_node: Node3D
+	var tree := get_tree()
+	if not tree or not tree.current_scene:
+		enemy.queue_free()
+		return
+	enemies_node = tree.current_scene.get_node_or_null("Enemies")
+	
+	enemy.tree_exited.connect(_on_enemy_killed)
+	active_enemies += 1
 	
 	if enemies_node:
 		enemies_node.add_child(enemy, true)
 		enemy.global_position = pos + Vector3(0, 1.0, 0)
-		enemy.tree_exited.connect(_on_enemy_killed)
-		active_enemies += 1
 	else:
 		# Create enemies node if missing
 		enemies_node = Node3D.new()
 		enemies_node.name = "Enemies"
-		get_tree().current_scene.add_child(enemies_node)
+		tree.current_scene.add_child(enemies_node)
 		enemies_node.add_child(enemy, true)
 		enemy.global_position = pos + Vector3(0, 1.0, 0)
-		enemy.tree_exited.connect(_on_enemy_killed)
-		active_enemies += 1
 
 # ═══════════════════════════════════════════════════════════════════
 #  WAVE COMPLETION & PROGRESSION
@@ -263,32 +259,29 @@ func _on_enemy_killed() -> void:
 		_complete_wave()
 
 func _complete_wave() -> void:
+	if not _wave_in_progress:
+		return  # Already completed
 	_wave_in_progress = false
 	is_spawning = false
 	spawn_timer.stop()
-	
-	print("╔══════════════════════════════════════════════════════════════╗")
-	print("║  WAVE ", current_wave, " CLEARED!                               ")
-	print("╚══════════════════════════════════════════════════════════════╝")
 	
 	wave_cleared.emit(current_wave)
 	
 	# Start next wave after delay
 	var next_wave = current_wave + 1
-	if next_wave <= 3:
-		print("WaveManager: Starting Wave ", next_wave, " in 5 seconds...")
-		var t := get_tree().create_timer(5.0)
-		t.timeout.connect(func(): _start_wave(next_wave))
-	else:
-		print("WaveManager: 🎉 ALL WAVES COMPLETED! VICTORY! 🎉")
+	if next_wave <= 6:
+		if get_tree():
+			var t := get_tree().create_timer(5.0)
+			t.timeout.connect(func(): _start_wave(next_wave))
 
 # ═══════════════════════════════════════════════════════════════════
 #  UTILITY
 # ═══════════════════════════════════════════════════════════════════
+@onready var _audio_manager: Node = get_node_or_null("/root/AudioManager")
+
 func _play_wave_sfx() -> void:
-	var am := get_node_or_null("/root/AudioManager")
-	if am and am.has_method("play_level_up"):
-		am.play_level_up()
+	if _audio_manager and _audio_manager.has_method("play_level_up"):
+		_audio_manager.play_level_up()
 
 func get_wave_progress() -> Dictionary:
 	return {

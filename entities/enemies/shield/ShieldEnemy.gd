@@ -11,10 +11,12 @@ const ANIM_IDLE := "Idle"
 const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
-	max_health = 250 # Tankier
+	max_health = 400 # +60% más tanky
 	super._ready()
-	move_speed = 2.5 # Slower
-	score_value = 50
+	move_speed = 0.8  # 80% más lento
+	attack_damage = 35  # +75% más daño
+	score_value = 80  # +60% más puntos
+	attack_cooldown = 1.0  # Ataques más frecuentes
 	_find_anim_player()
 	_setup_shield_visual()
 
@@ -44,7 +46,7 @@ func _find_anim_player() -> void:
 				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb")
 				return
 
-func _load_animations(anim_path: String) -> void:
+func _load_animations(_anim_path := "") -> void:
 	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
 	pass
 
@@ -72,23 +74,6 @@ func _update_animation() -> void:
 		State.DEAD:
 			_anim_player.stop()
 
-# Override take_damage to implement shield logic
-@rpc("any_peer", "call_local")
-func rpc_take_damage(amount: int) -> void:
-	if not multiplayer.is_server(): return
-	if current_state == State.DEAD: return
-	
-	# If damage comes from front, reduce it significantly (simulated shield)
-	# This is a bit complex without target info, but we can assume player is in front
-	# if we are in CHASE/ATTACK mode.
-	if current_state == State.CHASE or current_state == State.ATTACK:
-		amount = int(amount * 0.3) # 70% damage reduction from front
-		print("Shield blocks damage! Reduced to ", amount)
-	
-	current_health -= amount
-	_update_health_bar()
-	_hit_flash()
-	if current_health <= 0: die()
 
 func _perform_attack() -> void:
 	if target == null: return

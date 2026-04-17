@@ -1,6 +1,7 @@
 extends EnemyBase
 
 ## Boss — usa Skeleton_Rogue.glb (KayKit Skeletons)
+## BOSS FINAL: Usa textura MechaGolem para diferenciarse
 
 var attack_cooldown: float = 1.0
 var _attack_timer: float = 0.0
@@ -10,14 +11,22 @@ const ANIM_WALK := "Walk"
 const ANIM_IDLE := "Idle"
 const ANIM_ATTACK := "Attack"
 
+# Índice de textura mecha para el boss (MechaGolem = 4)
+const BOSS_MECHA_INDEX: int = 4
+
 func _ready() -> void:
-	max_health = 1000
+	max_health = 2000  # +100% más vida
 	super._ready()  # llama a la base que establece current_health = max_health
-	move_speed = 3.5
-	attack_damage = 50
-	score_value = 100
+	move_speed = 2.8  # 80% más lento
+	attack_damage = 80  # +60% más daño
+	score_value = 200  # +100% más puntos
+	attack_cooldown = 0.8  # Ataques más frecuentes
+	# IA más agresiva para boss
+	flank_chance = 0.6  # 60% probabilidad de flanquear
+	reaction_time = 0.15  # Reacciona muy rápido
 	_find_anim_player()
 	_setup_axe_visual()
+	_apply_mecha_texture_by_index(BOSS_MECHA_INDEX)  # BOSS: Textura MechaGolem fija
 
 func _setup_axe_visual() -> void:
 	var visual := get_node_or_null("VisualModel")
@@ -31,10 +40,10 @@ func _setup_axe_visual() -> void:
 		axe.scale = Vector3(1.2, 1.2, 1.2)
 	
 	# El Boss tiene escala extra para parecer más intimidante
-	visual = get_node_or_null("VisualModel") as Node3D
-	if visual:
-		visual.scale *= 1.5
-		_base_scale = visual.scale
+	var boss_visual := get_node_or_null("VisualModel") as Node3D
+	if boss_visual:
+		boss_visual.scale *= 1.5
+		_base_scale = boss_visual.scale
 		_scale_initialized = true
 
 func _find_anim_player() -> void:
@@ -51,7 +60,7 @@ func _find_anim_player() -> void:
 				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb")
 				return
 
-func _load_animations(anim_path: String) -> void:
+func _load_animations(_anim_path := "") -> void:
 	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
 	pass
 

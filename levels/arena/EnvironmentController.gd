@@ -17,6 +17,7 @@ extends Node3D
 
 @export var transition_duration: float = 3.0
 
+@onready var _wave_manager: Node = get_node_or_null("/root/WaveManager")
 var current_tween: Tween
 
 func _ready() -> void:
@@ -31,9 +32,8 @@ func _ready() -> void:
 			if lights.size() > 0:
 				sun_light = lights[0] as DirectionalLight3D
 	
-	var wm := get_node_or_null("/root/WaveManager")
-	if wm:
-		wm.wave_started.connect(_on_wave_started)
+	if _wave_manager:
+		_wave_manager.wave_started.connect(_on_wave_started)
 
 func _on_wave_started(wave_number: int) -> void:
 	var is_boss_wave: bool = (wave_number % 3 == 0)

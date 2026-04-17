@@ -25,7 +25,25 @@ const RADAR_UPDATE_INTERVAL: float = 0.1  # Update every 0.1s instead of every f
 var _radar_dots: Array[ColorRect] = []
 var _player: Node3D = null
 var _radar_update_timer: float = 0.0
-var _cached_enemies: Array = []
+var _cached_enemies: Array = []  # noqa: ARG001
+
+# Ability cooldown tracking
+var _ability_cooldowns: Dictionary = {
+	"katana": {"current": 0.0, "max": 0.5, "node": null},
+	"fireball": {"current": 0.0, "max": 2.0, "node": null},
+	"explosion": {"current": 0.0, "max": 5.0, "node": null},
+	"heal": {"current": 0.0, "max": 15.0, "node": null}
+}
+
+# Kill feed
+var _kill_feed_entries: Array[Label] = []
+const MAX_KILL_FEED_ENTRIES: int = 5
+
+# Stats tracking
+var _player_kills: int = 0
+var _bot_kills: int = 0
+var _survival_time: float = 0.0
+var _game_start_time: float = 0.0
 
 func _ready() -> void:
 	# Conectar señales del GameManager y WaveManager
@@ -49,6 +67,15 @@ func _ready() -> void:
 	
 	# Setup radar
 	_setup_radar()
+	
+	# Setup ability cooldowns
+	_setup_ability_cooldowns()
+	
+	# Setup kill feed
+	_setup_kill_feed()
+	
+	# Start survival timer
+	_game_start_time = Time.get_unix_time_from_system()
 
 func _create_enemy_counter() -> void:
 	_enemy_count_label = Label.new()
@@ -99,6 +126,15 @@ func _process(_delta: float) -> void:
 	
 	# Update radar (optimized - only every 0.1s, max 15 enemies)
 	_update_radar(_delta)
+	
+	# Update ability cooldowns
+	_update_ability_cooldowns(_delta)
+	
+	# Update kill feed (fade out)
+	_update_kill_feed(_delta)
+	
+	# Update survival time
+	_update_survival_time()
 
 func _on_score_changed(new_score: int) -> void:
 	score_label.text = "SCORE: " + str(new_score)
@@ -308,3 +344,140 @@ func _update_radar(delta: float) -> void:
 				dot.color = Color(1, 0, 0, 1)  # Red for normal
 		else:
 			dot.visible = false
+
+func _setup_ability_cooldowns() -> void:
+	var container = get_node_or_null("MarginContainer/UILayout/BottomUI/AbilitiesContainer")
+	if not container: return
+	
+	# Assign cooldown nodes
+	var katana = container.get_node_or_null("AbilityKatana/CooldownOverlay")
+	var fireball = container.get_node_or_null("AbilityFireball/CooldownOverlay")
+	var explosion = container.get_node_or_null("AbilityExplosion/CooldownOverlay")
+	var heal = container.get_node_or_null("AbilityHeal/CooldownOverlay")
+	
+	if katana: _ability_cooldowns["katana"]["node"] = katana
+	if fireball: _ability_cooldowns["fireball"]["node"] = fireball
+	if explosion: _ability_cooldowns["explosion"]["node"] = explosion
+	if heal: _ability_cooldowns["heal"]["node"] = heal
+	
+	# Style cooldown overlays
+	for ability in _ability_cooldowns:
+		var data = _ability_cooldowns[ability]
+		var node = data["node"] as ProgressBar
+		if node:
+			node.max_value = data["max"]
+			node.value = data["max"]
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0, 0, 0, 0.7)
+			style.corner_radius_top_left = 4
+			style.corner_radius_top_right = 4
+			style.corner_radius_bottom_right = 4
+			style.corner_radius_bottom_left = 4
+			node.add_theme_stylebox_override("background", style)
+
+func _update_ability_cooldowns(delta: float) -> void:
+	for ability in _ability_cooldowns:
+		var data = _ability_cooldowns[ability]
+		var node = data["node"] as ProgressBar
+		if node and data["current"] > 0:
+			data["current"] = max(0, data["current"] - delta)
+			node.value = data["current"]
+			# Visual: show cooldown as overlay
+			if data["current"] <= 0:
+				node.modulate = Color(1, 1, 1, 0.3)  # Ready - dimmed
+			else:
+				node.modulate = Color(1, 1, 1, 1)  # On cooldown
+
+func update_ability_cooldown(ability_name: String, cooldown_time: float) -> void:
+	if _ability_cooldowns.has(ability_name):
+		_ability_cooldowns[ability_name]["current"] = cooldown_time
+		_ability_cooldowns[ability_name]["max"] = cooldown_time
+
+func _setup_kill_feed() -> void:
+	var top_bar = get_node_or_null("MarginContainer/UILayout/TopBar")
+	if not top_bar: return
+	
+	# Create container for kill feed on the right side
+	for i in range(MAX_KILL_FEED_ENTRIES):
+		var label = Label.new()
+		label.name = "KillFeed_" + str(i)
+		label.add_theme_font_size_override("font_size", 14)
+		label.modulate = Color(1, 1, 1, 0)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		top_bar.add_child(label)
+		_kill_feed_entries.append(label)
+
+func _update_kill_feed(delta: float) -> void:
+	# Fade out kill feed entries
+	for i in range(_kill_feed_entries.size()):
+		var label = _kill_feed_entries[i]
+		if label.modulate.a > 0:
+			label.modulate.a = max(0, label.modulate.a - delta * 0.5)
+
+func add_kill_feed_entry(killer_name: String, enemy_type: String, points: int) -> void:
+	# Shift entries down
+	for i in range(_kill_feed_entries.size() - 1, 0, -1):
+		_kill_feed_entries[i].text = _kill_feed_entries[i - 1].text
+		_kill_feed_entries[i].modulate.a = _kill_feed_entries[i - 1].modulate.a
+	
+	# Add new entry at top
+	_kill_feed_entries[0].text = "%s killed %s +%d" % [killer_name, enemy_type, points]
+	_kill_feed_entries[0].modulate.a = 1.0
+
+func _update_survival_time() -> void:
+	if _game_start_time > 0:
+		_survival_time = Time.get_unix_time_from_system() - _game_start_time
+		var minutes = int(_survival_time / 60.0)
+		var seconds = int(_survival_time) % 60
+		# Update or create survival time label
+		var top_bar = get_node_or_null("MarginContainer/UILayout/TopBar")
+		if top_bar:
+			var time_label = top_bar.get_node_or_null("TimeLabel")
+			if not time_label:
+				time_label = Label.new()
+				time_label.name = "TimeLabel"
+				time_label.add_theme_font_size_override("font_size", 18)
+				top_bar.add_child(time_label)
+			time_label.text = "TIME: %02d:%02d" % [minutes, seconds]
+
+func record_kill(is_player: bool) -> void:
+	if is_player:
+		_player_kills += 1
+	else:
+		_bot_kills += 1
+	
+	# Update kill stats display
+	var top_bar = get_node_or_null("MarginContainer/UILayout/TopBar")
+	if top_bar:
+		var stats_label = top_bar.get_node_or_null("KillStatsLabel")
+		if not stats_label:
+			stats_label = Label.new()
+			stats_label.name = "KillStatsLabel"
+			stats_label.add_theme_font_size_override("font_size", 14)
+			stats_label.modulate = Color(0.7, 0.7, 1.0)
+			top_bar.add_child(stats_label)
+		stats_label.text = "KILLS: P%d | B%d" % [_player_kills, _bot_kills]
+
+# ═══════════════════════════════════════════════════════════════════
+#  FALL WARNING SYSTEM
+# ═══════════════════════════════════════════════════════════════════
+var _fall_warning_label: Label = null
+
+func show_fall_warning(time_remaining: float) -> void:
+	if not _fall_warning_label:
+		_fall_warning_label = Label.new()
+		_fall_warning_label.name = "FallWarningLabel"
+		_fall_warning_label.add_theme_font_size_override("font_size", 32)
+		_fall_warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_fall_warning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_fall_warning_label.set_anchors_preset(Control.PRESET_CENTER)
+		add_child(_fall_warning_label)
+	
+	_fall_warning_label.visible = true
+	var seconds = max(0, ceil(time_remaining))
+	_fall_warning_label.text = "⚠️ RETURN TO MAP! %ds" % seconds
+	_fall_warning_label.modulate = Color(1.0, 0.3, 0.3) if time_remaining < 1.0 else Color(1.0, 0.8, 0.2)
+
+func hide_fall_warning() -> void:
+	if _fall_warning_label:
+		_fall_warning_label.visible = false

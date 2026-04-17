@@ -31,11 +31,33 @@ func _build_city() -> void:
 	print("CityPropsSpawner: City layout complete.")
 
 func _place_starting_weapons() -> void:
+	# Spawnear armas Styloo aleatorias (12 tipos diferentes)
 	var weapon_pts = [
-		Vector3(0, 0.5, 5), Vector3(10, 0.5, 0), Vector3(-10, 0.5, 5), Vector3(0, 0.5, -10), Vector3(12, 0.5, 12), Vector3(-12, 0.5, -12)
+		Vector3(0, 0.5, 5), Vector3(10, 0.5, 0), Vector3(-10, 0.5, 5), 
+		Vector3(0, 0.5, -10), Vector3(12, 0.5, 12), Vector3(-12, 0.5, -12),
+		Vector3(20, 0.5, 20), Vector3(-20, 0.5, -20), Vector3(25, 0.5, -15),
+		Vector3(-25, 0.5, 15), Vector3(15, 0.5, -25), Vector3(-15, 0.5, 25)
 	]
-	for p in weapon_pts:
-		rpc("_spawn_weapon_pickup_at", p)
+	
+	# Styloo weapon types
+	var styloo_types = [
+		"bayonet", "coolknife", "doubleAxe", "katana", "kunai", "longsword",
+		"normalsword", "pickaxe", "shuriken1", "shuriken2", "shuriken3", "shuriken4",
+		"simpleAxe", "sword1"
+	]
+	
+	for i in range(weapon_pts.size()):
+		var weapon_type = styloo_types[i % styloo_types.size()]
+		rpc("_spawn_styloo_weapon_at", weapon_pts[i], weapon_type)
+
+@rpc("authority", "call_local")
+func _spawn_styloo_weapon_at(pos: Vector3, weapon_type: String) -> void:
+	var pickup_scene = load("res://entities/interactables/StylooWeaponPickup.tscn")
+	if pickup_scene:
+		var w = pickup_scene.instantiate()
+		w.weapon_type = weapon_type
+		get_tree().current_scene.add_child(w)
+		w.global_position = pos
 
 @rpc("authority", "call_local")
 func _spawn_weapon_pickup_at(p: Vector3) -> void:

@@ -10,12 +10,15 @@ const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
 	super._ready()
-	attack_range = 2.5
-	move_speed = 7.5  # Más rápido que otros enemigos
-	attack_damage = 15
-	max_health = 120
-	current_health = 120
-	score_value = 20
+	attack_range = 3.0  # Mayor rango
+	move_speed = 5.6  # 80% más lento
+	attack_damage = 25  # +67% más daño
+	max_health = 180  # +50% más vida
+	current_health = 180
+	score_value = 30  # +50% más puntos
+	# IA más agresiva
+	flank_chance = 0.5  # 50% probabilidad de flanquear
+	reaction_time = 0.2  # Reacciona más rápido
 	_find_anim_player()
 	_setup_daggers_visual()
 	_setup_glow()  # VISUAL: Glow effect for miniboss
@@ -63,7 +66,7 @@ func _find_anim_player() -> void:
 				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb")
 				return
 
-func _load_animations(anim_path: String) -> void:
+func _load_animations(_anim_path := "") -> void:
 	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
 	pass
 

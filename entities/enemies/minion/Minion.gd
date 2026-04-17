@@ -10,12 +10,12 @@ const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
 	super._ready()
-	attack_range = 1.5
-	move_speed = 4.0  # Rápido pero no tanto como Rogue
-	attack_damage = 8  # Daño bajo
-	max_health = 80   # Más resistente
-	current_health = 80
-	score_value = 5   # Pocos puntos
+	attack_range = 2.0
+	move_speed = 3.2  # 80% más lento
+	attack_damage = 15  # +87% más daño
+	max_health = 120   # +50% más resistente
+	current_health = 120
+	score_value = 10   # +100% más puntos
 	_find_anim_player()
 	_setup_visual()
 
@@ -39,7 +39,7 @@ func _find_anim_player() -> void:
 				_load_animations("res://assets/models/characters/KayKit_Skeletons_1.1_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb")
 				return
 
-func _load_animations(anim_path: String) -> void:
+func _load_animations(_anim_path := "") -> void:
 	# SIMPLIFIED: Las animaciones vienen incluidas en los modelos .glb
 	pass
 

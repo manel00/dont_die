@@ -157,7 +157,7 @@ func _cmd_set_input_action(p: Dictionary) -> Dictionary:
 	return {"action": action_name, "ok": true}
 
 
-func _key_from_string(key_str: String) -> Key:
+func _key_from_string(key_str: String) -> int:
 	var upper := key_str.to_upper().strip_edges()
 	match upper:
 		"A": return KEY_A

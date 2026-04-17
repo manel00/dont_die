@@ -54,6 +54,7 @@ func _create_particles() -> void:
 	queue_free()
 
 func _play_effect() -> void:
-	# Flash de muerte
+	# Flash de muerte - usar valor muy pequeño en lugar de ZERO para evitar error de matriz no invertible
 	var tween = create_tween().set_parallel(true)
-	tween.tween_property(self, "scale", Vector3.ZERO, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_property(self, "scale", Vector3(0.001, 0.001, 0.001), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_callback(queue_free).set_delay(0.3)

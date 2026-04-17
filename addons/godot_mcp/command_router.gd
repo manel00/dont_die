@@ -45,7 +45,7 @@ func _register_commands() -> void:
 			push_warning("[MCP] Failed to load handler: %s" % handler_path)
 			continue
 
-		var instance = script.new()
+		var instance: Object = script.new()
 		if instance == null:
 			push_warning("[MCP] Failed to instantiate handler: %s" % handler_path)
 			continue
@@ -94,11 +94,7 @@ func execute(command: String, payload: Dictionary) -> Dictionary:
 		return {"error": result.get("__error")}
 
 	return {
-		"result": {
-			"tool": command,
-			"implemented": true,
-			"data": result
-		}
+		"result": result
 	}
 
 

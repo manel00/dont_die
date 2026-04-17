@@ -48,36 +48,38 @@ func _on_new_player_connected(id: int) -> void:
 		return  # Host already spawned in _initial_spawn
 	spawn_player(id)
 
+@onready var _players_node: Node = $Players
+
 func spawn_player(id: int) -> void:
-	if $Players.get_node_or_null(str(id)):
+	if _players_node.get_node_or_null(str(id)):
 		return
-	var idx: int = NetworkManager.players.keys().find(id)
+	var idx = NetworkManager.players.keys().find(id)
 	print("Arena: Spawning player authority=", id)
 	var p: Node = _player_scene.instantiate()
 	p.name = str(id)
 	p.position = _get_spawn_position(idx)
-	$Players.add_child(p, true)
+	_players_node.add_child(p, true)
 
 func remove_player(id: int) -> void:
-	var p: Node = $Players.get_node_or_null(str(id))
+	var p: Node = _players_node.get_node_or_null(str(id))
 	if p:
 		p.queue_free()
 		print("Arena: Removed player ", id)
 
 # ── Solo-mode bot helpers ─────────────────────────────────────────
 func _spawn_player_at(id: int, spawn_pos: Vector3) -> void:
-	if $Players.get_node_or_null(str(id)):
+	if _players_node.get_node_or_null(str(id)):
 		return
 	var p: Node = _player_scene.instantiate()
 	p.name = str(id)
 	p.position = spawn_pos
-	$Players.add_child(p)
+	_players_node.add_child(p)
 
 func _spawn_bot_at(bot_index: int, spawn_pos: Vector3) -> void:
 	var bot: Node = _bot_scene.instantiate()
 	bot.name = "Bot_" + str(bot_index)
 	bot.position = spawn_pos
-	$Players.add_child(bot)
+	_players_node.add_child(bot)
 
 # ── Utilities ─────────────────────────────────────────────────────
 func _get_spawn_position(index: int) -> Vector3:

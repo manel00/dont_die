@@ -6,6 +6,7 @@ extends Node
 const DROP_CHANCE = 0.5 # 50% chance per enemy
 
 var loot_item_scene = preload("res://entities/interactables/LootItem.tscn")
+var weapon_pickup_scene = preload("res://entities/interactables/WeaponPickup.tscn")
 
 func _ready() -> void:
 	if multiplayer.is_server():
@@ -35,22 +36,28 @@ func try_drop_loot(position: Vector3) -> void:
 	if not multiplayer.is_server(): return
 	
 	var r = randf()
-	if r <= 0.15: # Weapon pickup (15%) - increased from 5%
-		rpc("_spawn_weapon_pickup", position)
-	elif r <= 0.5: # Common heal (35%)
+	if r <= 0.10: # Health orb (10%)
 		rpc("_spawn_loot", position)
+	elif r <= 0.20: # Weapon pickup (10%)
+		rpc("_spawn_weapon_pickup", position)
 
 @rpc("authority", "call_local")
 func _spawn_weapon_pickup(position: Vector3) -> void:
-	var scene = load("res://entities/interactables/WeaponPickup.tscn")
-	if scene:
-		var instance = scene.instantiate()
-		get_tree().current_scene.add_child(instance)
-		instance.global_position = position + Vector3(0, 1.0, 0)
+	if not weapon_pickup_scene: return
+	var tree := get_tree()
+	if not tree or not tree.current_scene: return
+	var instance = weapon_pickup_scene.instantiate()
+	# Random weapon type
+	var weapon_types = ["sword", "shotgun", "rifle"]
+	instance.weapon_type = weapon_types[randi() % weapon_types.size()]
+	tree.current_scene.add_child(instance)
+	instance.global_position = position + Vector3(0, 1.0, 0)
 
 @rpc("authority", "call_local")
 func _spawn_loot(position: Vector3) -> void:
 	if not loot_item_scene: return
+	var tree := get_tree()
+	if not tree or not tree.current_scene: return
 	var loot = loot_item_scene.instantiate()
-	get_tree().current_scene.add_child(loot)
+	tree.current_scene.add_child(loot)
 	loot.global_position = position + Vector3(0, 0.5, 0)

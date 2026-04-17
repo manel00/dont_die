@@ -7,12 +7,12 @@ var status_label: Label
 
 
 func _enter_tree() -> void:
-	command_router = preload("res://addons/godot_mcp/command_router.gd").new()
+	command_router = preload("res://addons/godot_mcp/command_router.gd").new() as Node
 	command_router.name = "MCPCommandRouter"
 	command_router.editor_plugin = self
 	add_child(command_router)
 
-	websocket_server = preload("res://addons/godot_mcp/websocket_server.gd").new()
+	websocket_server = preload("res://addons/godot_mcp/websocket_server.gd").new() as Node
 	websocket_server.name = "MCPWebSocketServer"
 	websocket_server.command_router = command_router
 	add_child(websocket_server)

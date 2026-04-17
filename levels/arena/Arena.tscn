@@ -1,8 +1,8 @@
-[gd_scene load_steps=10 format=3 uid="uid://be5e8u3v7k6m4"]
+[gd_scene format=3 uid="uid://do78o8emaefrm"]
 
-[ext_resource type="Script" path="res://levels/arena/Arena.gd" id="1_arena"]
-[ext_resource type="Script" path="res://levels/arena/EnvironmentController.gd" id="2_env"]
-[ext_resource type="Script" path="res://levels/arena/CityPropsSpawner.gd" id="3_city"]
+[ext_resource type="Script" uid="uid://djsmpi1jn7wgv" path="res://levels/arena/Arena.gd" id="1_arena"]
+[ext_resource type="Script" uid="uid://c708qrovvoy3" path="res://levels/arena/EnvironmentController.gd" id="2_env"]
+[ext_resource type="Script" uid="uid://8a302i63imoi" path="res://levels/arena/CityPropsSpawner.gd" id="3_city"]
 [ext_resource type="PackedScene" path="res://ui/hud/HUD.tscn" id="4_hud"]
 [ext_resource type="PackedScene" path="res://entities/interactables/WeaponPickup.tscn" id="5_wep"]
 
@@ -30,10 +30,8 @@ ssao_intensity = 3.0
 ssil_enabled = true
 sdfgi_enabled = true
 sdfgi_use_occlusion = true
-sdfgi_read_sky_light = true
 glow_enabled = true
 glow_bloom = 0.3
-glow_blend_mode = 1
 fog_enabled = true
 fog_light_color = Color(0.2, 0.3, 0.4, 1)
 fog_density = 0.005
@@ -46,113 +44,111 @@ size = Vector3(250, 2, 250)
 [sub_resource type="NavigationMesh" id="NavigationMesh_1"]
 agent_height = 0.95
 agent_radius = 0.35
-agent_max_climb = 0.25
-agent_max_slope = 45.0
 
-[node name="Arena" type="Node3D"]
+[node name="Arena" type="Node3D" unique_id=1663212986]
 script = ExtResource("1_arena")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=465129854]
 environment = SubResource("Environment_1")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." groups=["sun_light"]]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=563756580 groups=["sun_light"]]
 transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 15, 0)
-light_color = Color(0.8, 0.9, 1.0, 1)
+light_color = Color(0.8, 0.9, 1, 1)
 light_energy = 0.8
 shadow_enabled = true
 directional_shadow_mode = 1
 directional_shadow_blend_splits = true
 
-[node name="FloorStaticBody" type="StaticBody3D" parent="."]
+[node name="FloorStaticBody" type="StaticBody3D" parent="." unique_id=989270217]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorStaticBody"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorStaticBody" unique_id=854592146]
 shape = SubResource("BoxShape3D_floor")
 
-[node name="EnvironmentController" type="Node3D" parent="." node_paths=PackedStringArray("environment_node", "sun_light")]
+[node name="EnvironmentController" type="Node3D" parent="." unique_id=1195732149 node_paths=PackedStringArray("environment_node", "sun_light")]
 script = ExtResource("2_env")
 environment_node = NodePath("../WorldEnvironment")
 sun_light = NodePath("../DirectionalLight3D")
 
-[node name="HUD" parent="." instance=ExtResource("4_hud")]
+[node name="HUD" parent="." unique_id=1586186887 instance=ExtResource("4_hud")]
 
-[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." groups=["navigation_regions"]]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=162198092 groups=["navigation_regions"]]
 navigation_mesh = SubResource("NavigationMesh_1")
 
-[node name="City" type="Node3D" parent="NavigationRegion3D"]
+[node name="City" type="Node3D" parent="NavigationRegion3D" unique_id=1149816017]
 script = ExtResource("3_city")
 
-[node name="Players" type="Node3D" parent="."]
+[node name="Players" type="Node3D" parent="." unique_id=2021986613]
 
-[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1245227061]
 _spawnable_scenes = PackedStringArray("res://entities/player/Player.tscn")
 spawn_path = NodePath("../Players")
 
-[node name="Enemies" type="Node3D" parent="."]
+[node name="Enemies" type="Node3D" parent="." unique_id=16442833]
 
-[node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="." unique_id=546225358]
 _spawnable_scenes = PackedStringArray("res://entities/enemies/zombie/Zombie.tscn", "res://entities/enemies/mage/Mage.tscn", "res://entities/enemies/boss/Boss.tscn", "res://entities/enemies/rogue/Rogue.tscn", "res://entities/enemies/minion/Minion.tscn")
 spawn_path = NodePath("../Enemies")
 
-[node name="Spawners" type="Node3D" parent="."]
+[node name="Spawners" type="Node3D" parent="." unique_id=1106484398]
 
-[node name="Spawner_N" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_N" type="Marker3D" parent="Spawners" unique_id=496625837 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -48)
 
-[node name="Spawner_NE" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_NE" type="Marker3D" parent="Spawners" unique_id=1599994496 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1, -40)
 
-[node name="Spawner_E" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_E" type="Marker3D" parent="Spawners" unique_id=973585827 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 1, 0)
 
-[node name="Spawner_SE" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_SE" type="Marker3D" parent="Spawners" unique_id=1671129803 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 1, 40)
 
-[node name="Spawner_S" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_S" type="Marker3D" parent="Spawners" unique_id=1365552908 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 48)
 
-[node name="Spawner_SW" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_SW" type="Marker3D" parent="Spawners" unique_id=335823062 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1, 40)
 
-[node name="Spawner_W" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_W" type="Marker3D" parent="Spawners" unique_id=561579041 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 1, 0)
 
-[node name="Spawner_NW" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_NW" type="Marker3D" parent="Spawners" unique_id=1568252174 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 1, -40)
 
-[node name="Spawner_Inner_N" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_Inner_N" type="Marker3D" parent="Spawners" unique_id=1319832738 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -20)
 
-[node name="Spawner_Inner_E" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_Inner_E" type="Marker3D" parent="Spawners" unique_id=1129291781 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1, 0)
 
-[node name="Spawner_Inner_S" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_Inner_S" type="Marker3D" parent="Spawners" unique_id=2067609060 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 20)
 
-[node name="Spawner_Inner_W" type="Marker3D" parent="Spawners" groups=["spawners"]]
+[node name="Spawner_Inner_W" type="Marker3D" parent="Spawners" unique_id=839249383 groups=["spawners"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 1, 0)
 
-[node name="PlayerSpawnMarkers" type="Node3D" parent="."]
+[node name="PlayerSpawnMarkers" type="Node3D" parent="." unique_id=2060911782]
 
-[node name="PlayerSpawn1" type="Marker3D" parent="PlayerSpawnMarkers" groups=["player_spawns"]]
+[node name="PlayerSpawn1" type="Marker3D" parent="PlayerSpawnMarkers" unique_id=1968708891 groups=["player_spawns"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
-[node name="PlayerSpawn2" type="Marker3D" parent="PlayerSpawnMarkers" groups=["player_spawns"]]
+[node name="PlayerSpawn2" type="Marker3D" parent="PlayerSpawnMarkers" unique_id=1978873276 groups=["player_spawns"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 4)
 
-[node name="PlayerSpawn3" type="Marker3D" parent="PlayerSpawnMarkers" groups=["player_spawns"]]
+[node name="PlayerSpawn3" type="Marker3D" parent="PlayerSpawnMarkers" unique_id=1946120381 groups=["player_spawns"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, -4)
 
-[node name="WeaponPickups" type="Node3D" parent="."]
+[node name="WeaponPickups" type="Node3D" parent="." unique_id=986847327]
 
-[node name="WeaponPickup1" parent="WeaponPickups" instance=ExtResource("5_wep")]
+[node name="WeaponPickup1" parent="WeaponPickups" unique_id=1622616284 instance=ExtResource("5_wep")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 5)
 
-[node name="WeaponPickup2" parent="WeaponPickups" instance=ExtResource("5_wep")]
+[node name="WeaponPickup2" parent="WeaponPickups" unique_id=567998858 instance=ExtResource("5_wep")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -5)
 
-[node name="WeaponPickup3" parent="WeaponPickups" instance=ExtResource("5_wep")]
+[node name="WeaponPickup3" parent="WeaponPickups" unique_id=1583732840 instance=ExtResource("5_wep")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.5, 0)
 
-[node name="WeaponPickup4" parent="WeaponPickups" instance=ExtResource("5_wep")]
+[node name="WeaponPickup4" parent="WeaponPickups" unique_id=2059587666 instance=ExtResource("5_wep")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.5, 0)
