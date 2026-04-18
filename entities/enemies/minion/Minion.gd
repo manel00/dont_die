@@ -1,7 +1,7 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## Minion — usa Skeleton_Minion.glb (KayKit Skeletons)
-## Enemigo débil pero numeroso, ataca en grupo
+## Minion â€” usa Skeleton_Minion.glb (KayKit Skeletons)
+## Enemigo dÃ©bil pero numeroso, ataca en grupo
 
 var _anim_player: AnimationPlayer = null
 const ANIM_WALK := "Walk"
@@ -11,18 +11,18 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 2.0
-	move_speed = 3.2  # 80% más lento
-	attack_damage = 15  # +87% más daño
-	max_health = 120   # +50% más resistente
+	move_speed = 3.2  # 80% mÃ¡s lento
+	attack_damage = 15  # +87% mÃ¡s daÃ±o
+	max_health = 120   # +50% mÃ¡s resistente
 	current_health = 120
-	score_value = 10   # +100% más puntos
+	score_value = 10   # +100% mÃ¡s puntos
 	_find_anim_player()
 	_setup_visual()
 
 func _setup_visual() -> void:
 	var visual := get_node_or_null("VisualModel")
 	if not visual: return
-	# El minion es más pequeño
+	# El minion es mÃ¡s pequeÃ±o
 	visual.scale = Vector3(0.35, 0.35, 0.35)
 
 func _find_anim_player() -> void:
@@ -57,7 +57,7 @@ func _update_animation() -> void:
 		State.CHASE:
 			if _anim_player.has_animation(ANIM_WALK) and _anim_player.current_animation != ANIM_WALK:
 				_anim_player.play(ANIM_WALK)
-				# Animación más rápida para el minion
+				# AnimaciÃ³n mÃ¡s rÃ¡pida para el minion
 				_anim_player.speed_scale = 1.5
 		State.ATTACK:
 			if _anim_player.has_animation(ANIM_ATTACK) and _anim_player.current_animation != ANIM_ATTACK:
@@ -72,7 +72,7 @@ func _perform_attack() -> void:
 	var move_dir := Vector3(dir.x, 0, dir.z).normalized()
 	rotation.y = atan2(move_dir.x, move_dir.z)
 	
-	# Daño en área muy corto alcance
+	# DaÃ±o en Ã¡rea muy corto alcance
 	if multiplayer.is_server():
 		var enemies = get_tree().get_nodes_in_group("player")
 		for e in enemies:
@@ -81,7 +81,7 @@ func _perform_attack() -> void:
 					e.take_damage(attack_damage)
 
 func die() -> void:
-	# Override para añadir efecto de muerte de minion (explosión pequeña)
+	# Override para aÃ±adir efecto de muerte de minion (explosiÃ³n pequeÃ±a)
 	_death_effect()
 	super.die()
 

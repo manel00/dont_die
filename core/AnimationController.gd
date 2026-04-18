@@ -1,7 +1,7 @@
-class_name AnimationController
+﻿class_name AnimationController
 extends Node
 
-## AnimationController — Sistema completo de animaciones para personajes KayKit
+## AnimationController â€” Sistema completo de animaciones para personajes KayKit
 ## Gestiona AnimationTree con StateMachine para Idle, Walk, Run, Attack, Death
 
 @export var character_model: Node3D
@@ -29,7 +29,7 @@ func _ready() -> void:
 
 func _setup_animation_tree() -> void:
 	if not animation_player:
-		print("AnimationController: No AnimationPlayer assigned. Using fallback logic.")
+		# print("AnimationController: No AnimationPlayer assigned. Using fallback logic.")
 		# Crear animaciones procedimentales como fallback
 		_create_fallback_animations()
 		return
@@ -93,19 +93,19 @@ func _add_transition(from: String, to: String, auto_return: bool = false) -> voi
 	transition.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
 	
 	if auto_return:
-		# Volver automáticamente al estado anterior después de la animación
+		# Volver automÃ¡ticamente al estado anterior despuÃ©s de la animaciÃ³n
 		transition.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
 	
 	state_machine.add_transition(from, to, transition)
 	
 	if auto_return:
-		# Agregar transición de retorno
+		# Agregar transiciÃ³n de retorno
 		var return_trans = AnimationNodeStateMachineTransition.new()
 		return_trans.switch_mode = AnimationNodeStateMachineTransition.SWITCH_MODE_AT_END
 		return_trans.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_AUTO
 		state_machine.add_transition(to, from, return_trans)
 
-# API Pública
+# API PÃºblica
 
 func play_idle() -> void:
 	if _state_machine and _current_state != AnimState.IDLE:
@@ -151,5 +151,5 @@ func is_playing(anim_name: String) -> bool:
 
 func _create_fallback_animations() -> void:
 	# Fallback: crear animaciones procedimentales simples
-	# El sistema funcionará sin AnimationTree pero con animaciones básicas
+	# El sistema funcionarÃ¡ sin AnimationTree pero con animaciones bÃ¡sicas
 	_current_state = AnimState.IDLE

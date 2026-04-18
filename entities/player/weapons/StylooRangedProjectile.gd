@@ -1,10 +1,10 @@
 class_name StylooRangedProjectile
 extends Area3D
 
-## StylooRangedProjectile — Sistema de proyectiles para armas ranged del pack Styloo
-## Shurikens: Rápido, rebota en paredes
-## Kunai: Muy rápido, atraviesa enemigos  
-## Hachas: Lento, pesado, gran daño en área
+## StylooRangedProjectile â€” Sistema de proyectiles para armas ranged del pack Styloo
+## Shurikens: RÃ¡pido, rebota en paredes
+## Kunai: Muy rÃ¡pido, atraviesa enemigos  
+## Hachas: Lento, pesado, gran daÃ±o en Ã¡rea
 
 @export var speed: float = 30.0
 @export var damage: int = 25
@@ -17,15 +17,15 @@ var _pierce_count: int = 0  # Para kunai que atraviesa
 var _max_pierce: int = 3
 var _is_axe: bool = false
 var _spin_speed: float = 0.0
-var _damaged_enemies: Dictionary = {}  # Track enemigos ya dañados (para evitar daño múltiple)
+var _damaged_enemies: Dictionary = {}  # Track enemigos ya daÃ±ados (para evitar daÃ±o mÃºltiple)
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	
-	# Configurar según tipo de arma
+	# Configurar segÃºn tipo de arma
 	_setup_weapon_behavior()
 	
-	# Auto-destruir después de tiempo de vida
+	# Auto-destruir despuÃ©s de tiempo de vida
 	var timer = get_tree().create_timer(life_time)
 	timer.timeout.connect(queue_free)
 	
@@ -35,15 +35,15 @@ func _ready() -> void:
 func _setup_weapon_behavior() -> void:
 	match weapon_type:
 		"shuriken1", "shuriken2", "shuriken3", "shuriken4":
-			# Shurikens: Rápido, rebota, daño medio
+			# Shurikens: RÃ¡pido, rebota, daÃ±o medio
 			speed = 35.0
 			damage = 22
 			life_time = 2.5
 			_max_pierce = 0  # No atraviesa, rebota
-			_spin_speed = 720.0  # RPM de rotación
+			_spin_speed = 720.0  # RPM de rotaciÃ³n
 			
 		"kunai":
-			# Kunai: Muy rápido, atraviesa 3 enemigos
+			# Kunai: Muy rÃ¡pido, atraviesa 3 enemigos
 			speed = 45.0
 			damage = 28
 			life_time = 2.0
@@ -51,7 +51,7 @@ func _setup_weapon_behavior() -> void:
 			_spin_speed = 0  # No rota, vuela recto
 			
 		"doubleAxe", "simpleAxe":
-			# Hachas: Lento pero devastador, daño en área
+			# Hachas: Lento pero devastador, daÃ±o en Ã¡rea
 			speed = 18.0
 			damage = 70
 			life_time = 4.0
@@ -111,7 +111,7 @@ func _create_visual_mesh() -> void:
 	
 	mesh_instance.material_override = mat
 	
-	# Trail de partículas
+	# Trail de partÃ­culas
 	_create_trail()
 
 func _get_weapon_color() -> Color:
@@ -157,7 +157,7 @@ func _spawn_muzzle_flash() -> void:
 	flash.omni_range = 1.5
 	add_child(flash)
 	
-	# Fade out rápido
+	# Fade out rÃ¡pido
 	var tw = create_tween()
 	tw.tween_property(flash, "light_energy", 0.0, 0.1)
 	tw.tween_callback(flash.queue_free)
@@ -166,47 +166,47 @@ func _physics_process(delta: float) -> void:
 	# Mover proyectil
 	global_position += direction * speed * delta
 	
-	# Rotar según tipo
+	# Rotar segÃºn tipo
 	if _spin_speed > 0:
 		rotate_z(deg_to_rad(_spin_speed * delta))
 	
 	# Gravedad para hachas (lanzamiento pesado)
 	if _is_axe:
-		direction.y -= 2.0 * delta  # Caída lenta
+		direction.y -= 2.0 * delta  # CaÃ­da lenta
 		direction = direction.normalized()
 
 func _on_body_entered(body: Node3D) -> void:
 	# DEBUG: Log todas las colisiones
-	print("DEBUG StylooProjectile collision: proj=", get_instance_id(), " weapon=", weapon_type,
-		" body=", body.name, " groups=", body.get_groups(), 
-		" in_hit_group=", body.is_in_group(hit_group), " has_take_damage=", body.has_method("take_damage"))
+	# print("DEBUG StylooProjectile collision: proj=", get_instance_id(), " weapon=", weapon_type,
+	# 	" body=", body.name, " groups=", body.get_groups(), 
+	# 	" in_hit_group=", body.is_in_group(hit_group), " has_take_damage=", body.has_method("take_damage"))
 	
-	# Verificar si es enemigo válido
+	# Verificar si es enemigo vÃ¡lido
 	if body.is_in_group(hit_group) and body.has_method("take_damage"):
-		# Evitar dañar al mismo enemigo múltiples veces
+		# Evitar daÃ±ar al mismo enemigo mÃºltiples veces
 		var enemy_id = body.get_instance_id()
 		if _damaged_enemies.has(enemy_id):
-			print("DEBUG StylooProjectile: already damaged enemy ", body.name, ", ignoring")
-			return  # Ya dañamos a este enemigo, ignorar
+			# print("DEBUG StylooProjectile: already damaged enemy ", body.name, ", ignoring")
+			return  # Ya daÃ±amos a este enemigo, ignorar
 		
-		# Marcar como dañado
+		# Marcar como daÃ±ado
 		_damaged_enemies[enemy_id] = true
 		
-		# Aplicar daño
-		print("DEBUG StylooProjectile: DEALING DAMAGE to ", body.name, " damage=", damage, " weapon=", weapon_type)
+		# Aplicar daÃ±o
+		# print("DEBUG StylooProjectile: DEALING DAMAGE to ", body.name, " damage=", damage, " weapon=", weapon_type)
 		body.take_damage(damage)
 		
 		# Spawnear efecto de impacto
 		_spawn_impact_effect(body.global_position)
 		
-		# Comportamiento según tipo de arma
+		# Comportamiento segÃºn tipo de arma
 		if weapon_type == "kunai" and _pierce_count < _max_pierce:
 			# Kunai atraviesa enemigos
 			_pierce_count += 1
-			print("DEBUG StylooProjectile: kunai pierce continues, count=", _pierce_count)
+			# print("DEBUG StylooProjectile: kunai pierce continues, count=", _pierce_count)
 			return  # No destruir, sigue volando
 		elif _is_axe:
-			# Hacha causa daño en área
+			# Hacha causa daÃ±o en Ã¡rea
 			_aoe_damage(body.global_position)
 			queue_free()
 		else:
@@ -214,11 +214,11 @@ func _on_body_entered(body: Node3D) -> void:
 			queue_free()
 			
 	elif body.is_in_group("enemies") or body.is_in_group("player"):
-		# Golpeó personaje pero no es objetivo válido
+		# GolpeÃ³ personaje pero no es objetivo vÃ¡lido
 		queue_free()
 		
 	else:
-		# Golpeó ambiente (pared, suelo, etc)
+		# GolpeÃ³ ambiente (pared, suelo, etc)
 		if weapon_type.begins_with("shuriken"):
 			# Shurikens rebotan en paredes
 			_bounce_off_wall(body)
@@ -232,7 +232,7 @@ func _bounce_off_wall(wall: Node3D) -> void:
 	bounce_dir.y = 0  # Mantener en plano horizontal principalmente
 	
 	if bounce_dir.length() < 0.1:
-		bounce_dir = -direction  # Rebote simple si no hay dirección clara
+		bounce_dir = -direction  # Rebote simple si no hay direcciÃ³n clara
 	
 	# Reducir velocidad en cada rebote
 	speed *= 0.7
@@ -266,7 +266,7 @@ func _bounce_off_wall(wall: Node3D) -> void:
 	timer.timeout.connect(particles.queue_free)
 
 func _aoe_damage(center: Vector3) -> void:
-	# Daño en área para hachas
+	# DaÃ±o en Ã¡rea para hachas
 	var radius: float = 4.0
 	var enemies = get_tree().get_nodes_in_group(hit_group)
 	
@@ -274,13 +274,13 @@ func _aoe_damage(center: Vector3) -> void:
 		if is_instance_valid(enemy) and enemy is Node3D:
 			var dist = enemy.global_position.distance_to(center)
 			if dist < radius:
-				# Daño decreciente con distancia
+				# DaÃ±o decreciente con distancia
 				var damage_mult = 1.0 - (dist / radius)
 				var aoe_damage = int(damage * damage_mult)
 				if enemy.has_method("take_damage"):
 					enemy.take_damage(aoe_damage)
 	
-	# Efecto visual de explosión
+	# Efecto visual de explosiÃ³n
 	var explosion = CSGSphere3D.new()
 	explosion.radius = 0.5
 	

@@ -1,4 +1,4 @@
-class_name ExplosiveBarrel
+﻿class_name ExplosiveBarrel
 extends StaticBody3D
 
 @export var max_health: int = 30
@@ -14,7 +14,7 @@ var blast_radius_area: Area3D
 func _ready() -> void:
 	current_health = max_health
 	
-	# Crear área de explosión dinámicamente
+	# Crear Ã¡rea de explosiÃ³n dinÃ¡micamente
 	blast_radius_area = Area3D.new()
 	var col_shape := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
@@ -29,7 +29,7 @@ func take_damage(amount: int) -> void:
 	
 	current_health -= amount
 	
-	# Flash visual de daño
+	# Flash visual de daÃ±o
 	var mesh := get_node_or_null("MeshInstance3D") as MeshInstance3D
 	if mesh:
 		var flash_mat := StandardMaterial3D.new()
@@ -44,7 +44,7 @@ func take_damage(amount: int) -> void:
 
 func _trigger_explosion() -> void:
 	is_triggered = true
-	print("¡Barril activado! Explotando en ", fuse_time, "s...")
+	# print("Â¡Barril activado! Explotando en ", fuse_time, "s...")
 	
 	# Efecto de parpadeo antes de explotar
 	_blink_effect()
@@ -66,9 +66,9 @@ func _blink_effect() -> void:
 	tween.tween_interval(0.05)
 
 func _explode() -> void:
-	print("¡KABOOM!")
+	# print("Â¡KABOOM!")
 	
-	# Activar área y aplicar daño
+	# Activar Ã¡rea y aplicar daÃ±o
 	blast_radius_area.monitoring = true
 	await get_tree().process_frame  # Esperar un frame para que el Area3D detecte
 	
@@ -79,13 +79,13 @@ func _explode() -> void:
 			var falloff: float = clamp(1.0 - (dist / explosion_radius), 0.1, 1.0)
 			body.take_damage(int(explosion_damage * falloff))
 	
-	# Efecto GPUParticles3D de explosión
+	# Efecto GPUParticles3D de explosiÃ³n
 	_spawn_explosion_vfx()
 	
 	queue_free()
 
 func _spawn_explosion_vfx() -> void:
-	# Bola de fuego expandiéndose
+	# Bola de fuego expandiÃ©ndose
 	var fireball := CSGSphere3D.new()
 	fireball.radius = 0.3
 	var mat := StandardMaterial3D.new()
@@ -102,7 +102,7 @@ func _spawn_explosion_vfx() -> void:
 	tw.tween_property(mat, "albedo_color:a", 0.0, 0.4)
 	tw.chain().tween_callback(fireball.queue_free)
 	
-	# Partículas de escombros
+	# PartÃ­culas de escombros
 	var particles := GPUParticles3D.new()
 	var pmat := ParticleProcessMaterial.new()
 	pmat.direction = Vector3(0, 1, 0)

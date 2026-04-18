@@ -1,7 +1,7 @@
-extends Node
+﻿extends Node
 
 ## AudioManager (Autoload)
-## Sistema de audio con SFX sintéticos procedurales para disparo, impacto, muerte y UI.
+## Sistema de audio con SFX sintÃ©ticos procedurales para disparo, impacto, muerte y UI.
 
 var _sfx_bus_idx: int = 0
 var _music_bus_idx: int = 0
@@ -10,7 +10,7 @@ func _ready() -> void:
 	_setup_audio_buses()
 
 func _setup_audio_buses() -> void:
-	# Añadir bus SFX si no existe
+	# AÃ±adir bus SFX si no existe
 	if AudioServer.get_bus_index("SFX") == -1:
 		AudioServer.add_bus()
 		_sfx_bus_idx = AudioServer.get_bus_count() - 1
@@ -20,7 +20,7 @@ func _setup_audio_buses() -> void:
 	else:
 		_sfx_bus_idx = AudioServer.get_bus_index("SFX")
 	
-	# Añadir bus Music si no existe
+	# AÃ±adir bus Music si no existe
 	if AudioServer.get_bus_index("Music") == -1:
 		AudioServer.add_bus()
 		_music_bus_idx = AudioServer.get_bus_count() - 1
@@ -30,7 +30,7 @@ func _setup_audio_buses() -> void:
 	else:
 		_music_bus_idx = AudioServer.get_bus_index("Music")
 
-# ── Reproducción SFX sintéticos ──────────────────────────────────
+# â”€â”€ ReproducciÃ³n SFX sintÃ©ticos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 func play_shoot() -> void:
 	_play_synth_sfx(880.0, 0.05, 0.8, "SFX")
 
@@ -57,7 +57,7 @@ func play_explosion() -> void:
 		await get_tree().create_timer(i * 0.05).timeout
 		_play_synth_sfx(80.0 + i * 30.0, 0.25, 1.5 - i * 0.3, "SFX")
 
-# ── Internos ──────────────────────────────────────────────────────
+# â”€â”€ Internos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 func _play_synth_sfx(frequency: float, duration: float, volume_db: float, bus: String) -> void:
 	var player := AudioStreamPlayer.new()
 	var gen := AudioStreamGenerator.new()

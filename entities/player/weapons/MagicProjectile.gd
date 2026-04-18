@@ -1,4 +1,4 @@
-class_name MagicProjectile
+﻿class_name MagicProjectile
 extends Area3D
 
 @export var speed: float = 30.0
@@ -7,7 +7,7 @@ extends Area3D
 @export var hit_group: String = "enemies"
 
 var direction: Vector3 = Vector3.FORWARD
-var _grace_timer: float = 0.15  # FIX: timer de gracia para evitar explosión al spawnear
+var _grace_timer: float = 0.15  # FIX: timer de gracia para evitar explosiÃ³n al spawnear
 
 func _ready() -> void:
 	# FIX: Iniciar monitoreo desactivado, activarlo tras el timer de gracia
@@ -28,17 +28,17 @@ func _on_body_entered(body: Node3D) -> void:
 	if not (body is CharacterBody3D or (body is StaticBody3D and body.has_method("take_damage"))):
 		return
 	
-	# Daño en área a todos los targets del grupo correcto en radio
+	# DaÃ±o en Ã¡rea a todos los targets del grupo correcto en radio
 	var targets := get_tree().get_nodes_in_group(hit_group)
-	print("DEBUG MagicProjectile: checking ", targets.size(), " targets in group '", hit_group, "'")
+	# print("DEBUG MagicProjectile: checking ", targets.size(), " targets in group '", hit_group, "'")
 	for t in targets:
 		if is_instance_valid(t) and t.global_position.distance_to(global_position) <= explosion_radius:
 			if t.has_method("take_damage"):
 				var dist = t.global_position.distance_to(global_position)
-				print("DEBUG MagicProjectile: HIT target=", t.name, " dist=", dist, " damage=", impact_damage)
+				# print("DEBUG MagicProjectile: HIT target=", t.name, " dist=", dist, " damage=", impact_damage)
 				t.take_damage(int(impact_damage))
 				
-	# Efecto visual de explosión
+	# Efecto visual de explosiÃ³n
 	var explosion := CSGSphere3D.new()
 	explosion.radius = explosion_radius
 	explosion.radial_segments = 32

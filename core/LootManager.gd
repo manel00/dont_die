@@ -1,4 +1,4 @@
-extends Node
+﻿extends Node
 
 ## LootManager (Autoload)
 ## Handles serverside loot drop spawning when enemies die.
@@ -6,7 +6,7 @@ extends Node
 const DROP_CHANCE = 0.5 # 50% chance per enemy
 
 var loot_item_scene = preload("res://entities/interactables/LootItem.tscn")
-var weapon_pickup_scene = preload("res://entities/interactables/WeaponPickup.tscn")
+var weapon_pickup_scene = preload("res://entities/interactables/StylooWeaponPickup.tscn")
 
 func _ready() -> void:
 	if multiplayer.is_server():
@@ -47,8 +47,12 @@ func _spawn_weapon_pickup(position: Vector3) -> void:
 	var tree := get_tree()
 	if not tree or not tree.current_scene: return
 	var instance = weapon_pickup_scene.instantiate()
-	# Random weapon type
-	var weapon_types = ["sword", "shotgun", "rifle"]
+	# Random weapon type from Styloo 
+	var weapon_types = [
+		"bayonet", "coolknife", "doubleAxe", "katana", "kunai", "longsword",
+		"normalsword", "pickaxe", "shuriken1", "shuriken2", "shuriken3", "shuriken4",
+		"simpleAxe", "sword1"
+	]
 	instance.weapon_type = weapon_types[randi() % weapon_types.size()]
 	tree.current_scene.add_child(instance)
 	instance.global_position = position + Vector3(0, 1.0, 0)

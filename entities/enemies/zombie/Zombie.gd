@@ -1,6 +1,6 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## Zombie — usa Skeleton_Minion.glb (KayKit Skeletons)
+## Zombie â€” usa Skeleton_Minion.glb (KayKit Skeletons)
 
 var attack_cooldown: float = 1.0
 var _attack_timer: float = 0.0
@@ -70,5 +70,5 @@ func _perform_attack() -> void:
 	if _attack_timer <= 0.0:
 		if target.has_method("take_damage"):
 			target.take_damage(attack_damage)
-			print("¡Zombi muerde al jugador por ", attack_damage, "!")
+			# print("Â¡Zombi muerde al jugador por ", attack_damage, "!")
 			_attack_timer = attack_cooldown

@@ -1,13 +1,14 @@
-class_name GrenadeProjectile
+﻿class_name GrenadeProjectile
 extends Area3D
 
-@export var speed: float = 15.0
 @export var damage: int = 60
 @export var explosion_radius: float = 6.0
 @export var life_time: float = 4.0
 @export var hit_group: String = "enemies"
 
-var direction: Vector3 = Vector3.FORWARD
+
+
+var initial_velocity: Vector3 = Vector3.ZERO
 var _velocity: Vector3 = Vector3.ZERO
 var _has_exploded: bool = false
 var _spin_speed: float = 360.0  # RPM
@@ -16,33 +17,36 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	add_to_group("projectiles")
 	
-	# Auto-destruir después de tiempo de vida
+	# Auto-destruir despuÃ©s de tiempo de vida
 	var timer = get_tree().create_timer(life_time)
 	timer.timeout.connect(_explode)
 	
 	# Crear mesh visual
 	_create_visual()
 	
-	# Inicializar velocidad con arco
-	_velocity = direction * speed
-	_velocity.y = 8.0  # Arco inicial
+	# Usar velocidad inicial provista por el lanzador
+	if initial_velocity != Vector3.ZERO:
+		_velocity = initial_velocity
+	else:
+		_velocity = Vector3.FORWARD * 15.0  # Fallback
+		_velocity.y = 8.0
 
 func _create_visual() -> void:
 	var mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "GrenadeMesh"
 	add_child(mesh_instance)
 	
-	# Mesh esférico para granada
+	# Mesh esfÃ©rico para granada
 	mesh_instance.mesh = SphereMesh.new()
 	mesh_instance.mesh.radius = 0.25
 	mesh_instance.mesh.height = 0.5
 	
 	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.3, 0.3, 0.3)  # Gris metálico
+	mat.albedo_color = Color(0.3, 0.3, 0.3)  # Gris metÃ¡lico
 	mat.metallic = 0.8
 	mat.roughness = 0.4
 	
-	# Emisión roja pulsante
+	# EmisiÃ³n roja pulsante
 	mat.emission_enabled = true
 	mat.emission = Color(1.0, 0.0, 0.2)
 	mat.emission_energy_multiplier = 2.0
@@ -57,7 +61,7 @@ func _create_visual() -> void:
 	light.omni_range = 4.0
 	add_child(light)
 	
-	# Animación de pulso
+	# AnimaciÃ³n de pulso
 	var tw = create_tween().set_loops().set_parallel(true)
 	tw.tween_property(light, "light_energy", 5.0, 0.3)
 	tw.chain().tween_property(light, "light_energy", 2.0, 0.3)
@@ -81,11 +85,11 @@ func _on_body_entered(body: Node3D) -> void:
 	if _has_exploded:
 		return
 	
-	# Explosión al tocar enemigo
+	# ExplosiÃ³n al tocar enemigo
 	if body.is_in_group(hit_group) and body.has_method("take_damage"):
 		_explode()
 	elif body is StaticBody3D or body is CSGShape3D:
-		# Explosión al tocar suelo/escenario
+		# ExplosiÃ³n al tocar suelo/escenario
 		_explode()
 
 func _explode() -> void:
@@ -93,7 +97,7 @@ func _explode() -> void:
 		return
 	_has_exploded = true
 	
-	# Daño en área
+	# DaÃ±o en Ã¡rea
 	var targets := get_tree().get_nodes_in_group(hit_group)
 	for t in targets:
 		if is_instance_valid(t) and t is Node3D:
@@ -104,7 +108,7 @@ func _explode() -> void:
 					var final_damage = int(damage * damage_mult)
 					t.take_damage(final_damage)
 	
-	# Efecto visual de explosión
+	# Efecto visual de explosiÃ³n
 	_spawn_explosion_effect()
 	
 	# Ocultar mesh
@@ -112,7 +116,7 @@ func _explode() -> void:
 	if mesh:
 		mesh.visible = false
 	
-	# Destruir después de efecto
+	# Destruir despuÃ©s de efecto
 	await get_tree().create_timer(0.5).timeout
 	queue_free()
 
@@ -121,7 +125,7 @@ func _spawn_explosion_effect() -> void:
 	if not scene:
 		return
 	
-	# Esfera de explosión
+	# Esfera de explosiÃ³n
 	var explosion = CSGSphere3D.new()
 	explosion.radius = 0.5
 	explosion.radial_segments = 32
@@ -137,13 +141,13 @@ func _spawn_explosion_effect() -> void:
 	scene.add_child(explosion)
 	explosion.global_position = global_position
 	
-	# Animación de expansión
+	# AnimaciÃ³n de expansiÃ³n
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(explosion, "radius", explosion_radius, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(mat, "albedo_color:a", 0.0, 0.4)
 	tw.chain().tween_callback(explosion.queue_free)
 	
-	# Partículas de explosión
+	# PartÃ­culas de explosiÃ³n
 	var particles = GPUParticles3D.new()
 	particles.amount = 50
 	particles.lifetime = 1.0
@@ -169,6 +173,6 @@ func _spawn_explosion_effect() -> void:
 	scene.add_child(particles)
 	particles.global_position = global_position
 	
-	# Auto-limpiar partículas
+	# Auto-limpiar partÃ­culas
 	var timer = get_tree().create_timer(1.5)
 	timer.timeout.connect(particles.queue_free)

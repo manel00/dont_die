@@ -1,12 +1,12 @@
 extends Area3D
 
-## StylooWeaponPickup — Sistema completo de pickups para el pack de armas Styloo
-## 12 armas únicas: bayonet, coolknife, doubleAxe, katana, kunai, longsword, 
+## StylooWeaponPickup â€” Sistema completo de pickups para el pack de armas Styloo
+## 12 armas Ãºnicas: bayonet, coolknife, doubleAxe, katana, kunai, longsword, 
 ## normalsword, pickaxe, shuriken1-4, simpleAxe, sword1
 
 const WEAPON_PACK_PATH := "res://assets/models/weapons/weaponsassetspackbyStyloo/"
 
-# Definición completa de las 12 armas Styloo
+# DefiniciÃ³n completa de las 12 armas Styloo
 const STYLOO_WEAPONS := {
 	"bayonet": {
 		"file": "ASSETS.fbx_bayonet.fbx",
@@ -37,7 +37,7 @@ const STYLOO_WEAPONS := {
 		"damage": 90,
 		"range": 5.0,
 		"color": Color(0.8, 0.2, 0.2, 1.0),  # Rojo sangre
-		"type": "ranged_lobber"  # Lanzamiento pesado con arco, daño en área masivo
+		"type": "ranged_lobber"  # Lanzamiento pesado con arco, daÃ±o en Ã¡rea masivo
 	},
 	"katana": {
 		"file": "ASSETS.fbx_katana.fbx",
@@ -57,8 +57,8 @@ const STYLOO_WEAPONS := {
 		"cooldown": 0.2,
 		"damage": 28,
 		"range": 2.0,
-		"color": Color(0.5, 0.0, 0.8, 1.0),  # Púrpura
-		"type": "ranged"  # Proyectil muy rápido que atraviesa enemigos
+		"color": Color(0.5, 0.0, 0.8, 1.0),  # PÃºrpura
+		"type": "ranged"  # Proyectil muy rÃ¡pido que atraviesa enemigos
 	},
 	"longsword": {
 		"file": "ASSETS.fbx_longsword.fbx",
@@ -88,7 +88,7 @@ const STYLOO_WEAPONS := {
 		"cooldown": 0.5,
 		"damage": 55,
 		"range": 3.5,
-		"color": Color(0.4, 0.3, 0.2, 1.0)  # Marrón herrumbre
+		"color": Color(0.4, 0.3, 0.2, 1.0)  # MarrÃ³n herrumbre
 	},
 	"shuriken1": {
 		"file": "ASSETS.fbx_shuriken1.fbx",
@@ -99,7 +99,7 @@ const STYLOO_WEAPONS := {
 		"damage": 22,
 		"range": 2.0,
 		"color": Color(1.0, 0.5, 0.0, 1.0),  # Naranja
-		"type": "ranged"  # Proyectil rápido que rebota
+		"type": "ranged"  # Proyectil rÃ¡pido que rebota
 	},
 	"shuriken2": {
 		"file": "ASSETS.fbx_shuriken2.fbx",
@@ -109,8 +109,8 @@ const STYLOO_WEAPONS := {
 		"cooldown": 0.15,
 		"damage": 22,
 		"range": 2.0,
-		"color": Color(0.0, 1.0, 0.5, 1.0),  # Verde neón
-		"type": "ranged"  # Proyectil rápido que rebota
+		"color": Color(0.0, 1.0, 0.5, 1.0),  # Verde neÃ³n
+		"type": "ranged"  # Proyectil rÃ¡pido que rebota
 	},
 	"shuriken3": {
 		"file": "ASSETS.fbx_shuriken3.fbx",
@@ -121,7 +121,7 @@ const STYLOO_WEAPONS := {
 		"damage": 18,
 		"range": 2.0,
 		"color": Color(1.0, 0.0, 1.0, 1.0),  # Magenta
-		"type": "ranged"  # Proyectil rápido que rebota
+		"type": "ranged"  # Proyectil rÃ¡pido que rebota
 	},
 	"shuriken4": {
 		"file": "ASSETS.fbx_shuriken4.fbx",
@@ -132,7 +132,7 @@ const STYLOO_WEAPONS := {
 		"damage": 25,
 		"range": 2.0,
 		"color": Color(1.0, 0.8, 0.0, 1.0),  # Oro
-		"type": "ranged"  # Proyectil rápido que rebota
+		"type": "ranged"  # Proyectil rÃ¡pido que rebota
 	},
 	"simpleAxe": {
 		"file": "ASSETS.fbx_simpleAxe.fbx",
@@ -143,7 +143,7 @@ const STYLOO_WEAPONS := {
 		"damage": 70,
 		"range": 4.0,
 		"color": Color(0.5, 0.5, 0.4, 1.0),  # Gris madera
-		"type": "ranged_lobber"  # Lanzamiento pesado con arco, daño en área
+		"type": "ranged_lobber"  # Lanzamiento pesado con arco, daÃ±o en Ã¡rea
 	},
 	"sword1": {
 		"file": "ASSETS.fbx_sword1.fbx",
@@ -160,16 +160,16 @@ const STYLOO_WEAPONS := {
 @export var weapon_type: String = "katana"  # Tipo por defecto
 
 var _weapon_data: Dictionary
-var _is_dropped: bool = false  # true = droppeado por jugador, desaparecerá si no se recoge
+var _is_dropped: bool = false  # true = droppeado por jugador, desaparecerÃ¡ si no se recoge
 var _despawn_timer: float = 0.0
-const DESPAWN_TIME: float = 10.0  # Segundos antes de desaparecer si es droppeado
+const DESPAWN_TIME: float = 5.0  # Segundos antes de desaparecer si es droppeado
 
 func _ready() -> void:
 	# Validar weapon_type
 	if not STYLOO_WEAPONS.has(weapon_type):
 		weapon_type = "katana"  # Fallback
 	
-	# Si no se asignaron datos externos (vía drop), usar defaults
+	# Si no se asignaron datos externos (vÃ­a drop), usar defaults
 	if _weapon_data.is_empty():
 		_weapon_data = STYLOO_WEAPONS[weapon_type].duplicate()
 		_weapon_data["uses_left"] = 5  # Usos por defecto
@@ -187,7 +187,7 @@ func _ready() -> void:
 	_setup_collision()
 	_start_animation()
 	
-	# Si es droppeado, iniciar timer de desaparición
+	# Si es droppeado, iniciar timer de desapariciÃ³n
 	if _is_dropped:
 		_start_despawn_timer()
 		# Efecto visual de "a punto de desaparecer"
@@ -201,15 +201,15 @@ func _physics_process(delta: float) -> void:
 
 func _start_despawn_timer() -> void:
 	_despawn_timer = 0.0
-	print("Weapon dropped: ", weapon_type, " (uses left: ", _weapon_data.get("uses_left", 0), ") - Despawn in ", DESPAWN_TIME, "s")
+	# print("Weapon dropped: ", weapon_type, " - Despawn in ", DESPAWN_TIME, "s")
 
 func _start_fading_warning() -> void:
-	# Parpadeo más rápido cuando está a punto de desaparecer
+	# Parpadeo mÃ¡s rÃ¡pido cuando estÃ¡ a punto de desaparecer
 	var visual = get_node_or_null("WeaponVisual")
 	if visual:
 		for child in visual.get_children():
 			if child is GeometryInstance3D:
-				# Hacer que parpadee durante los últimos 3 segundos
+				# Hacer que parpadee durante los Ãºltimos 3 segundos
 				var tw = create_tween().set_loops()
 				tw.tween_property(child, "modulate:a", 0.3, 0.2)
 				tw.tween_property(child, "modulate:a", 1.0, 0.2)
@@ -221,30 +221,8 @@ func _fade_out_and_despawn() -> void:
 	tw.tween_callback(queue_free)
 
 func _create_uses_indicator(uses_left: int) -> void:
-	# Crear pequeño indicador de usos restantes
-	var label = Label3D.new()
-	label.name = "UsesIndicator"
-	label.text = str(uses_left) + "/5"
-	label.font_size = 24
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.pixel_size = 0.003
-	
-	# Color según usos restantes
-	if uses_left >= 4:
-		label.modulate = Color(0.2, 1.0, 0.2)  # Verde (mucho uso)
-	elif uses_left >= 2:
-		label.modulate = Color(1.0, 1.0, 0.2)  # Amarillo (medio)
-	else:
-		label.modulate = Color(1.0, 0.2, 0.2)  # Rojo (poco uso)
-	
-	label.outline_modulate = Color.BLACK
-	label.position = Vector3(0, 1.5, 0)  # Arriba del arma
-	add_child(label)
-	
-	# Animar para que siempre mire a la cámara y flote
-	var tw = create_tween().set_loops()
-	tw.tween_property(label, "position:y", 1.6, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(label, "position:y", 1.4, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Sistema de municion infinita, ya no mostramos indicador de usos
+	pass
 
 func _setup_visual() -> void:
 	# Container para el arma
@@ -253,21 +231,18 @@ func _setup_visual() -> void:
 	add_child(container)
 	
 	# Mostrar usos restantes si es un arma con durabilidad limitada
-	var uses_left = _weapon_data.get("uses_left", 5)
-	if uses_left < 5 or _is_dropped:
-		_create_uses_indicator(uses_left)
+	pass
 	
 	# Intentar cargar modelo 3D
 	var weapon_path: String = WEAPON_PACK_PATH + _weapon_data.file
-	print("Attempting to load weapon: ", weapon_path)
+	# print("Attempting to load weapon: ", weapon_path)
 	
 	var weapon_resource = load(weapon_path)
 	if weapon_resource:
-		print("Weapon file loaded, instantiating...")
+		# print("Weapon file loaded, instantiating...")
 		var weapon_model = weapon_resource.instantiate()
-		
-		# Aplicar escala y transform
-		weapon_model.scale = _weapon_data.scale
+		# Aplicar escala (se multiplica por 300 para hacerlo 3 veces mÃ¡s grande de lo orginal 100x y contrarrestar el importe de Godot)
+		weapon_model.scale = _weapon_data.scale * 300.0
 		weapon_model.position = _weapon_data.position
 		weapon_model.rotation_degrees = _weapon_data.rotation
 		
@@ -275,20 +250,19 @@ func _setup_visual() -> void:
 		_apply_weapon_materials(weapon_model)
 		
 		container.add_child(weapon_model)
-		print("Weapon added to scene successfully")
+		# print("Weapon added to scene successfully")
 	else:
-		print("WARNING: Weapon file could not be loaded: ", weapon_path)
-		# Fallback: Crear representación con formas geométricas
+		# print("WARNING: Weapon file could not be loaded: ", weapon_path)
+		# Fallback: Crear representaciÃ³n con formas geomÃ©tricas
 		_create_fallback_visual(container)
 	
-	# Partículas de brillo con color del arma
+	# PartÃ­culas de brillo con color del arma (pero reducidas para no tapar)
 	_create_particles()
 	
 	# Luz omnidireccional con color del arma
 	_create_light()
 	
-	# Halo glow
-	_create_halo()
+	# Eliminado el "Halo glow" para que el arma se pueda ver perfectamente
 
 func _apply_weapon_materials(node: Node3D) -> void:
 	"""Aplica la textura original del asset pack a las armas en el suelo."""
@@ -342,7 +316,7 @@ func _create_fallback_visual(container: Node3D) -> void:
 			mesh.mesh.height = 0.1
 			
 		"coolknife":
-			# Cuchillo - forma pequeña y afilada
+			# Cuchillo - forma pequeÃ±a y afilada
 			mesh = MeshInstance3D.new()
 			mesh.mesh = BoxMesh.new()
 			mesh.mesh.size = Vector3(0.08, 0.4, 0.03)
@@ -367,30 +341,7 @@ func _create_fallback_visual(container: Node3D) -> void:
 	container.add_child(mesh)
 
 func _create_particles() -> void:
-	var particles = GPUParticles3D.new()
-	particles.name = "WeaponParticles"
-	particles.amount = 30
-	particles.lifetime = 1.2
-	particles.local_coords = false
-	
-	var particle_mat = ParticleProcessMaterial.new()
-	particle_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	particle_mat.emission_sphere_radius = 0.6
-	particle_mat.gravity = Vector3(0, 0.3, 0)
-	particle_mat.color = _weapon_data.color
-	particle_mat.scale_min = 0.03
-	particle_mat.scale_max = 0.12
-	particle_mat.radial_velocity_min = 0.1
-	particle_mat.radial_velocity_max = 0.3
-	particles.process_material = particle_mat
-	
-	var particle_mesh = SphereMesh.new()
-	particle_mesh.radius = 0.04
-	particle_mesh.height = 0.08
-	particles.draw_pass_1 = particle_mesh
-	particles.position.y = 0.8
-	
-	add_child(particles)
+	pass
 
 func _create_light() -> void:
 	var light = OmniLight3D.new()
@@ -401,39 +352,17 @@ func _create_light() -> void:
 	light.shadow_enabled = true
 	add_child(light)
 
-func _create_halo() -> void:
-	var halo = CSGSphere3D.new()
-	halo.name = "WeaponHalo"
-	halo.radius = 0.7
-	halo.radial_segments = 16
-	halo.rings = 8
-	
-	var halo_mat = StandardMaterial3D.new()
-	halo_mat.albedo_color = Color(_weapon_data.color.r, _weapon_data.color.g, _weapon_data.color.b, 0.25)
-	halo_mat.emission_enabled = true
-	halo_mat.emission = _weapon_data.color * 1.5
-	halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	halo.material = halo_mat
-	halo.position.y = 0.8
-	
-	add_child(halo)
-	
-	# Animación de pulso del halo
-	var tw = create_tween().set_loops().set_parallel(true)
-	tw.tween_property(halo, "scale", Vector3(1.3, 1.3, 1.3), 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.chain().tween_property(halo, "scale", Vector3(0.8, 0.8, 0.8), 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
 func _setup_collision() -> void:
 	var shape = CollisionShape3D.new()
 	shape.name = "CollisionShape3D"
 	add_child(shape)
 	
 	var sphere = SphereShape3D.new()
-	sphere.radius = 3.5  # Radio grande para pickup fácil
+	sphere.radius = 1.0  # Radio más ajustado para no atraparlas a kilómetros
 	shape.shape = sphere
 
 func _start_animation() -> void:
-	# Rotación constante
+	# RotaciÃ³n constante
 	var tw_rotate = create_tween().set_loops()
 	tw_rotate.tween_property(self, "rotation_degrees:y", 360, 4.0).from(0)
 	
@@ -445,6 +374,10 @@ func _start_animation() -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if not multiplayer.is_server():
 		return
+		
+	# Evitar recoger el arma en la misma décima de segundo que acabamos de dropearla (impide el bug de no poder soltar con Q)
+	if _is_dropped and _despawn_timer < 0.5:
+		return
 	
 	if body.is_in_group("player") and body.has_method("pickup_styloo_weapon"):
 		# Pasar todos los datos del arma al player
@@ -453,52 +386,21 @@ func _on_body_entered(body: Node3D) -> void:
 
 @rpc("authority", "call_local")
 func rpc_destroy() -> void:
-	# Guardar posición antes de destruir
+	# Guardar posiciÃ³n antes de destruir
 	var pos = global_position
-	# Efecto de recolección
+	# Efecto de recolecciÃ³n
 	_spawn_pickup_effect(pos)
 	queue_free()
 
 func _spawn_pickup_effect(pos: Vector3) -> void:
-	var tree = get_tree()
-	if not tree or not tree.current_scene:
-		return
-	
-	# Explosión de partículas al recoger
-	var effect = GPUParticles3D.new()
-	effect.amount = 50
-	effect.lifetime = 0.8
-	effect.explosiveness = 1.0
-	effect.local_coords = false
-	
-	var mat = ParticleProcessMaterial.new()
-	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	mat.emission_sphere_radius = 0.5
-	mat.initial_velocity_min = 3.0
-	mat.initial_velocity_max = 6.0
-	mat.color = _weapon_data.color
-	mat.scale_min = 0.05
-	mat.scale_max = 0.2
-	effect.process_material = mat
-	
-	var mesh = SphereMesh.new()
-	mesh.radius = 0.06
-	mesh.height = 0.12
-	effect.draw_pass_1 = mesh
-	
-	tree.current_scene.add_child(effect)
-	effect.global_position = pos
-	
-	# Auto-limpiar
-	var timer = tree.create_timer(1.0)
-	timer.timeout.connect(effect.queue_free)
+	pass
 
-# Función estática para obtener un tipo de arma aleatorio
+# FunciÃ³n estÃ¡tica para obtener un tipo de arma aleatorio
 static func get_random_weapon_type() -> String:
 	var types = STYLOO_WEAPONS.keys()
 	return types[randi() % types.size()]
 
-# Función estática para obtener datos de un arma
+# FunciÃ³n estÃ¡tica para obtener datos de un arma
 static func get_weapon_data(weapon_type_name: String) -> Dictionary:
 	if STYLOO_WEAPONS.has(weapon_type_name):
 		return STYLOO_WEAPONS[weapon_type_name]

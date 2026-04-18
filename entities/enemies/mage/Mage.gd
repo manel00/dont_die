@@ -1,6 +1,6 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## Mage — usa Skeleton_Mage.glb (KayKit Skeletons)
+## Mage â€” usa Skeleton_Mage.glb (KayKit Skeletons)
 ## MINIBOSS: Ataque a distancia con proyectiles elementales (hielo, fuego, electric)
 
 var attack_cooldown: float = 2.0
@@ -18,12 +18,12 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 15.0  # Mayor rango para miniboss
-	move_speed = 1.6  # 80% más lento
-	max_health = 350  # +75% más vida
+	move_speed = 1.6  # 80% mÃ¡s lento
+	max_health = 350  # +75% mÃ¡s vida
 	current_health = max_health
-	attack_damage = 50  # +43% más daño
-	score_value = 75  # +50% más puntos por ser miniboss
-	attack_cooldown = 1.5  # Ataques más frecuentes
+	attack_damage = 50  # +43% mÃ¡s daÃ±o
+	score_value = 75  # +50% mÃ¡s puntos por ser miniboss
+	attack_cooldown = 1.5  # Ataques mÃ¡s frecuentes
 	_find_anim_player()
 	_setup_staff_visual()
 	_setup_glow()
@@ -110,16 +110,16 @@ func _perform_attack() -> void:
 			_shoot_elemental_projectile(move_dir, element, i - 1)
 
 func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spread_index: int) -> void:
-	"""Dispara un proyectil elemental con color y efecto según el tipo."""
+	"""Dispara un proyectil elemental con color y efecto segÃºn el tipo."""
 	var proj := projectile_scene.instantiate()
 	proj.hit_group = "player"
 	proj.damage = attack_damage
 	
-	# Calcular dirección con spread (abanico)
-	var spread_angle: float = deg_to_rad(15.0 * spread_index)  # -15°, 0°, +15°
+	# Calcular direcciÃ³n con spread (abanico)
+	var spread_angle: float = deg_to_rad(15.0 * spread_index)  # -15Â°, 0Â°, +15Â°
 	var rotated_dir := base_dir.rotated(Vector3.UP, spread_angle)
 	
-	# Configurar color y efecto según elemento
+	# Configurar color y efecto segÃºn elemento
 	var color: Color
 	var emission: Color
 	var light_color: Color
@@ -128,17 +128,17 @@ func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spre
 			color = Color(0.2, 0.6, 1.0)  # Azul hielo
 			emission = Color(0.1, 0.4, 0.9)
 			light_color = Color(0.2, 0.5, 1.0)
-			proj.speed = 20.0  # Hielo: más lento pero congelante
+			proj.speed = 20.0  # Hielo: mÃ¡s lento pero congelante
 		ElementalType.FIRE:
 			color = Color(1.0, 0.3, 0.0)  # Rojo fuego
 			emission = Color(0.9, 0.2, 0.0)
 			light_color = Color(1.0, 0.4, 0.1)
-			proj.speed = 30.0  # Fuego: rápido y ardiente
+			proj.speed = 30.0  # Fuego: rÃ¡pido y ardiente
 		ElementalType.ELECTRIC:
-			color = Color(0.9, 0.9, 0.1)  # Amarillo eléctrico
+			color = Color(0.9, 0.9, 0.1)  # Amarillo elÃ©ctrico
 			emission = Color(0.8, 0.8, 0.0)
 			light_color = Color(1.0, 1.0, 0.2)
-			proj.speed = 35.0  # Eléctrico: muy rápido
+			proj.speed = 35.0  # ElÃ©ctrico: muy rÃ¡pido
 	
 	# Material elemental
 	var material := StandardMaterial3D.new()
@@ -149,7 +149,7 @@ func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spre
 	
 	get_tree().current_scene.add_child(proj)
 	
-	# Posición de spawn con offset para cada proyectil
+	# PosiciÃ³n de spawn con offset para cada proyectil
 	var spawn_offset := Vector3(0, 0.5 + (spread_index * 0.1), 0)
 	proj.global_position = global_position + spawn_offset + rotated_dir * 1.0
 	proj.direction = rotated_dir
@@ -164,7 +164,7 @@ func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spre
 	if mesh:
 		mesh.material_override = material
 	
-	# Añadir luz puntual al proyectil para efecto visual
+	# AÃ±adir luz puntual al proyectil para efecto visual
 	var light := OmniLight3D.new()
 	light.light_color = light_color
 	light.light_energy = 2.0

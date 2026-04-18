@@ -2,19 +2,19 @@ class_name EnemyBase
 extends CharacterBody3D
 
 @export_category("Enemy Stats")
-@export var max_health: int = 450  # +50% más vida
-@export var move_speed: float = 5.2  # +30%
-@export var attack_damage: int = 30  # +50% más daño
+@export var max_health: int = 450  # +50% mÃ¡s vida
+@export var move_speed: float = 6.24  # +50% from original 4.0
+@export var attack_damage: int = 30  # +50% mÃ¡s daÃ±o
 @export var attack_range: float = 2.5  # Mayor rango de ataque
-@export var score_value: int = 15  # +50% más puntos
+@export var score_value: int = 15  # +50% mÃ¡s puntos
 
 # IA mejorada
 @export_category("AI Behavior")
-@export var reaction_time: float = 0.3  # Tiempo de reacción
+@export var reaction_time: float = 0.3  # Tiempo de reacciÃ³n
 @export var strafe_enabled: bool = true  # Movimiento lateral inteligente
 @export var flank_chance: float = 0.3  # 30% probabilidad de flanquear
 @export var retreat_health_pct: float = 0.2  # Retirarse al 20% de vida
-@export var max_distance_from_player: float = 25.0  # Distancia máxima del jugador
+@export var max_distance_from_player: float = 25.0  # Distancia mÃ¡xima del jugador
 
 var current_health: int
 var target: Node3D = null
@@ -36,9 +36,9 @@ var _strafe_direction: int = 1
 var _attack_cooldown: float = 0.0
 var _is_flanking: bool = false
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #  MECHA TEXTURES SYSTEM
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const MECHA_TEXTURES: Array[String] = [
 	"res://assets/models/characters/Enemies_mecha/Arachnoid.png",
 	"res://assets/models/characters/Enemies_mecha/Companion-bot.png",
@@ -51,9 +51,9 @@ const MECHA_TEXTURES: Array[String] = [
 	"res://assets/models/characters/Enemies_mecha/ReconBot.png"
 ]
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #  PERFORMANCE OPTIMIZATION
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const DISTANCE_CULLING_THRESHOLD: float = 50.0  # No AI updates beyond this
 const ANIMATION_UPDATE_INTERVAL: float = 0.2    # Update animation every 0.2s
 const SHADOW_CULLING_DISTANCE: float = 40.0   # Disable shadows beyond this
@@ -66,9 +66,9 @@ static var _player_cache: Array[Node] = []
 static var _player_cache_timer: float = 0.0
 static var _player_cache_interval: float = 0.5
 
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #  MATERIAL CACHE - Reutilizar materiales para evitar lag
-# ═══════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 static var _mecha_materials: Array[StandardMaterial3D] = []
 static var _mecha_textures: Array[Texture2D] = []
 static var _materials_loaded: bool = false
@@ -79,31 +79,31 @@ func _ready() -> void:
 	# Asegurar que la barra de vida se actualice al spawnear
 	call_deferred("_update_health_bar")
 	
-	# Navegación
+	# NavegaciÃ³n
 	nav_agent = NavigationAgent3D.new()
 	nav_agent.name = "NavAgent"
 	add_child(nav_agent)
 	nav_agent.path_desired_distance = 1.0
 	nav_agent.target_desired_distance = attack_range
-	nav_agent.path_max_distance = 100.0  # Aumentar distancia máxima de path
-	nav_agent.navigation_layers = 1  # Asegurar que use la capa de navegación correcta
+	nav_agent.path_max_distance = 100.0  # Aumentar distancia mÃ¡xima de path
+	nav_agent.navigation_layers = 1  # Asegurar que use la capa de navegaciÃ³n correcta
 	
-	# Replicación - solo posición y rotación para evitar desincronización de salud
+	# ReplicaciÃ³n - solo posiciÃ³n y rotaciÃ³n para evitar desincronizaciÃ³n de salud
 	var sync := MultiplayerSynchronizer.new()
 	var config := SceneReplicationConfig.new()
 	config.add_property(".:position")
 	config.add_property(".:rotation")
 	config.add_property(".:velocity")
-	# NOTA: current_health y current_state NO se replican para evitar bugs de desincronización
-	# El servidor controla el daño y la muerte, los clientes reciben actualizaciones visuales
+	# NOTA: current_health y current_state NO se replican para evitar bugs de desincronizaciÃ³n
+	# El servidor controla el daÃ±o y la muerte, los clientes reciben actualizaciones visuales
 	sync.replication_config = config
 	add_child(sync)
 	
 	add_to_group("enemies")
 	
-	# DEBUG: Verificar inicialización correcta
-	print("DEBUG Enemy _ready: name=", name, " health=", current_health, "/", max_health, 
-		" in_group_enemies=", is_in_group("enemies"), " has_take_damage=", has_method("take_damage"))
+	# DEBUG: Verificar inicializaciÃ³n correcta
+	# print("DEBUG Enemy _ready: name=", name, " health=", current_health, "/", max_health, 
+	# 	" in_group_enemies=", is_in_group("enemies"), " has_take_damage=", has_method("take_damage"))
 	
 	# Capturar escala del modelo visual
 	var visual := _visual_model
@@ -118,12 +118,12 @@ func _ready() -> void:
 		_base_scale = Vector3(1.32, 1.32, 1.32)
 		_scale_initialized = true
 	
-	# ═══════════════════════════════════════════════════════════════════
+	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	#  VISUAL EFFECT: Spawn Effect
-	# ═══════════════════════════════════════════════════════════════════
+	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	call_deferred("_spawn_effect")
 	
-	# Buscar target inmediatamente después de spawnear
+	# Buscar target inmediatamente despuÃ©s de spawnear
 	call_deferred("_find_nearest_target")
 
 func _spawn_effect() -> void:
@@ -138,11 +138,11 @@ func _setup_health_bar() -> void:
 	# Determinar si es miniboss/boss para escalar la barra
 	var is_miniboss := max_health > 100
 	var bar_width := 6.0 if is_miniboss else 5.0  # Mitad de larga
-	var bar_height := 9.0 if is_miniboss else 7.5  # 5x más gruesa
+	var bar_height := 9.0 if is_miniboss else 7.5  # 5x mÃ¡s gruesa
 	var y_offset := 4.2 if is_miniboss else 3.5
 	var pixel_size := 0.004 if is_miniboss else 0.0035
 	
-	# Barra de fondo = vida máxima (negro)
+	# Barra de fondo = vida mÃ¡xima (negro)
 	_health_bar_bg = Sprite3D.new()
 	_health_bar_bg.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_health_bar_bg.pixel_size = pixel_size
@@ -176,20 +176,20 @@ func _update_health_bar() -> void:
 	
 	var pct = clamp(float(current_health) / max_health, 0.0, 1.0)
 	
-	# Escalar ancho según vida (la barra de color se reduce)
+	# Escalar ancho segÃºn vida (la barra de color se reduce)
 	_health_bar_fill.scale.x = bar_width * pct
 	
 	# Alinear a la izquierda (empezar desde el borde izquierdo del fondo)
 	# Desplazamiento = Mitad de la diferencia visual de escala total
-	# Ancho total visual del BG = 64 píxeles * pixel_size * bar_width
+	# Ancho total visual del BG = 64 pÃ­xeles * pixel_size * bar_width
 	var tex_width: float = 64.0
 	var total_w = tex_width * _health_bar_fill.pixel_size * bar_width
 	var current_w = tex_width * _health_bar_fill.pixel_size * (bar_width * pct)
 	var shift = (total_w - current_w) / 2.0
-	# Actualizamos offset X moviéndolo a la izquierda
+	# Actualizamos offset X moviÃ©ndolo a la izquierda
 	_health_bar_fill.position.x = -shift
 	
-	# Colores según vida baja (amarillo/rojo) - mantener color base si > 50%
+	# Colores segÃºn vida baja (amarillo/rojo) - mantener color base si > 50%
 	if pct > 0.5:
 		if is_miniboss:
 			_health_bar_fill.modulate = Color(0.4, 0.9, 1.0)  # Azul celeste brillante
@@ -200,24 +200,24 @@ func _update_health_bar() -> void:
 	else:
 		_health_bar_fill.modulate = Color(1.0, 0.3, 0.3)  # Rojo (peligro alto)
 	
-	# Ocultar barra si está muerto (vida <= 0)
+	# Ocultar barra si estÃ¡ muerto (vida <= 0)
 	if _health_bar_bg:
 		_health_bar_bg.visible = current_health > 0
 	_health_bar_fill.visible = current_health > 0
 	
-	# Forzar ocultación si la vida es <= 0
+	# Forzar ocultaciÃ³n si la vida es <= 0
 	if current_health <= 0:
 		if _health_bar_bg:
 			_health_bar_bg.visible = false
 		_health_bar_fill.visible = false
 
 func _fix_zero_scales() -> void:
-	# Solo asegurar que el VisualModel tenga escala válida
+	# Solo asegurar que el VisualModel tenga escala vÃ¡lida
 	var visual := _visual_model
 	if visual:
 		# Asegurar que la escala base se capture correctamente
 		_base_scale = visual.scale
-		# Resetear a escala base si hay valores inválidos
+		# Resetear a escala base si hay valores invÃ¡lidos
 		if _base_scale.x == 0 or _base_scale.y == 0 or _base_scale.z == 0:
 			_base_scale = Vector3(1.32, 1.32, 1.32)
 			visual.scale = _base_scale
@@ -228,10 +228,10 @@ func _physics_process(delta: float) -> void:
 		visible = false
 		return
 
-	# ═══════════════════════════════════════════════════════════════════
+	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	#  PERFORMANCE: Distance Culling & Batch Updates
-	# ═══════════════════════════════════════════════════════════════════
-	# Actualizar cache de jugadores periódicamente
+	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+	# Actualizar cache de jugadores periÃ³dicamente
 	_player_cache_timer += delta
 	if _player_cache_timer >= _player_cache_interval:
 		_player_cache_timer = 0.0
@@ -256,7 +256,7 @@ func _physics_process(delta: float) -> void:
 		else:
 			_is_ai_frozen = false
 	
-	# En modo offline/solo, también somos el servidor
+	# En modo offline/solo, tambiÃ©n somos el servidor
 	var is_authority = multiplayer.is_server() or not multiplayer.has_multiplayer_peer()
 	if is_authority:
 		if not is_on_floor(): velocity += get_gravity() * delta
@@ -281,13 +281,13 @@ func _physics_process(delta: float) -> void:
 		_visual_model.scale = _base_scale
 
 func _handle_state_machine(delta: float) -> void:
-	# Verificación de seguridad: si ya está muerto, no procesar
+	# VerificaciÃ³n de seguridad: si ya estÃ¡ muerto, no procesar
 	if current_state == State.DEAD or current_health <= 0:
 		return
 	
 	if target != null and not is_instance_valid(target): target = null
 	
-	# Siempre buscar el jugador más cercano si no tenemos target
+	# Siempre buscar el jugador mÃ¡s cercano si no tenemos target
 	if target == null:
 		_find_nearest_target()
 	
@@ -358,7 +358,7 @@ func _handle_state_machine(delta: float) -> void:
 				var target_rotation = atan2(move_direction.x, move_direction.z)
 				rotation.y = lerp_angle(rotation.y, target_rotation, 12.0 * delta)
 			
-			# Volver a chase después de strafear un poco
+			# Volver a chase despuÃ©s de strafear un poco
 			if randf() < 0.02:  # 2% chance por frame de salir de strafe
 				current_state = State.CHASE
 			
@@ -367,7 +367,7 @@ func _handle_state_machine(delta: float) -> void:
 				current_state = State.IDLE
 				return
 			
-			# Huir del jugador cuando está bajo de vida
+			# Huir del jugador cuando estÃ¡ bajo de vida
 			var to_target = target.global_position - global_position
 			var retreat_dir = -Vector3(to_target.x, 0, to_target.z).normalized()
 			
@@ -400,25 +400,25 @@ func _handle_state_machine(delta: float) -> void:
 					_attack_cooldown = 0.8  # Cooldown entre ataques
 
 func _evaluate_state() -> void:
-	# Evaluar si cambiar de estado basado en situación
+	# Evaluar si cambiar de estado basado en situaciÃ³n
 	if current_state == State.DEAD or target == null:
 		return
 	
 	var health_pct = float(current_health) / max_health
 	var dist = global_position.distance_to(target.global_position)
 	
-	# PRIORIDAD: Si está a más de max_distance, siempre chase aunque esté en otro estado
+	# PRIORIDAD: Si estÃ¡ a mÃ¡s de max_distance, siempre chase aunque estÃ© en otro estado
 	if dist > max_distance_from_player and current_state != State.CHASE and current_state != State.ATTACK:
 		current_state = State.CHASE
 		_is_flanking = false
 		return
 	
-	# Retirarse si vida muy baja (solo si no está muy lejos)
+	# Retirarse si vida muy baja (solo si no estÃ¡ muy lejos)
 	if health_pct < retreat_health_pct and current_state != State.RETREAT and dist <= max_distance_from_player:
 		current_state = State.RETREAT
 		return
 	
-	# Strafe si está muy cerca y no puede atacar (solo si no está muy lejos)
+	# Strafe si estÃ¡ muy cerca y no puede atacar (solo si no estÃ¡ muy lejos)
 	if dist < attack_range * 0.8 and current_state == State.CHASE and strafe_enabled and dist <= max_distance_from_player:
 		_strafe_direction = 1 if randf() > 0.5 else -1
 		current_state = State.STRAFE
@@ -458,7 +458,7 @@ func rpc_sync_health(new_hp: int, damage_taken: int) -> void:
 	if current_state == State.DEAD:
 		return
 
-	# Aseguramos de que nunca sobrepase los límites de forma imprevista
+	# Aseguramos de que nunca sobrepase los lÃ­mites de forma imprevista
 	current_health = clamp(new_hp, 0, max_health)
 	
 	_update_health_bar()
@@ -480,9 +480,9 @@ func take_damage(amount: int) -> void:
 	if current_state == State.DEAD:
 		return
 		
-	# Rediseñado de 0: Servidor gestiona todo el cálculo blindado
+	# RediseÃ±ado de 0: Servidor gestiona todo el cÃ¡lculo blindado
 	if multiplayer.is_server() or not multiplayer.has_multiplayer_peer():
-		var actual_damage = max(0, amount) # Prohíbe totalmente healing por daño negativo
+		var actual_damage = max(0, amount) # ProhÃ­be totalmente healing por daÃ±o negativo
 		var new_hp = current_health - actual_damage
 		rpc_sync_health.rpc(new_hp, actual_damage)
 	else:
@@ -507,7 +507,7 @@ func _hit_flash() -> void:
 			tw.tween_property(mesh, "modulate", Color.WHITE, 0.15)
 
 func _hit_effect() -> void:
-	# Partículas de impacto
+	# PartÃ­culas de impacto
 	var hit_effect = load("res://entities/effects/HitEffect.gd")
 	if hit_effect:
 		var effect = Node3D.new()
@@ -516,7 +516,7 @@ func _hit_effect() -> void:
 		effect.position = Vector3(randf_range(-0.3, 0.3), 1.0, randf_range(-0.3, 0.3))
 
 func _show_damage_number(amount: int) -> void:
-	# Crear label flotante de daño
+	# Crear label flotante de daÃ±o
 	var label = Label3D.new()
 	label.text = "-" + str(amount)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -541,9 +541,9 @@ func die() -> void:
 	if _health_bar_fill:
 		_health_bar_fill.visible = false
 	
-	# ═══════════════════════════════════════════════════════════════════
+	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	#  VISUAL EFFECT: Death Effect
-	# ═══════════════════════════════════════════════════════════════════
+	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	_death_effect()
 	
 	# Screen shake for miniboss deaths
@@ -558,7 +558,7 @@ func die() -> void:
 	var lm = get_node_or_null("/root/LootManager")
 	if lm: lm.try_drop_loot(global_position)
 	
-	# Death animation más rápida y con fade
+	# Death animation mÃ¡s rÃ¡pida y con fade
 	visible = false  # Hide main mesh, show particles instead
 	
 	# Delay destroy to let particles play
@@ -607,7 +607,7 @@ func _ensure_materials_loaded() -> void:
 			_mecha_materials.append(mat)
 	
 	_materials_loaded = true
-	print("EnemyBase: Pre-loaded ", _mecha_materials.size(), " mecha materials for optimization")
+	# print("EnemyBase: Pre-loaded ", _mecha_materials.size(), " mecha materials for optimization")
 
 func _apply_random_mecha_texture() -> void:
 	"""Aplica una textura mecha aleatoria como decal/emissive overlay en el modelo visual."""
@@ -620,10 +620,10 @@ func _apply_random_mecha_texture() -> void:
 	if _mecha_materials.is_empty():
 		return
 	
-	# Seleccionar índice aleatorio
+	# Seleccionar Ã­ndice aleatorio
 	var idx := randi() % _mecha_materials.size()
 	
-	# Crear un Sprite3D que actúe como overlay de textura mecha
+	# Crear un Sprite3D que actÃºe como overlay de textura mecha
 	var mecha_decal := Sprite3D.new()
 	mecha_decal.name = "MechaTextureOverlay"
 	mecha_decal.texture = _mecha_textures[idx]
@@ -640,7 +640,7 @@ func _apply_random_mecha_texture() -> void:
 	visual.add_child(mecha_decal)
 
 func _apply_mecha_texture_by_index(index: int) -> void:
-	"""Aplica una textura mecha específica por índice."""
+	"""Aplica una textura mecha especÃ­fica por Ã­ndice."""
 	_ensure_materials_loaded()
 	
 	if index < 0 or index >= _mecha_materials.size():
@@ -666,7 +666,7 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 	visual.add_child(mecha_decal)
 
 func _animate_visuals(delta: float) -> void:
-	# Escala fija - no permitir cambios dinámicos de tamaño
+	# Escala fija - no permitir cambios dinÃ¡micos de tamaÃ±o
 	if _visual_model and _scale_initialized:
 		# Mantener siempre la escala base sin animaciones
 		_visual_model.scale = _base_scale

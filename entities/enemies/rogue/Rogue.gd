@@ -1,7 +1,7 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## Rogue — usa Skeleton_Rogue.glb (KayKit Skeletons)
-## Enemigo rápido de cuerpo a cuerpo con dagas
+## Rogue â€” usa Skeleton_Rogue.glb (KayKit Skeletons)
+## Enemigo rÃ¡pido de cuerpo a cuerpo con dagas
 
 var _anim_player: AnimationPlayer = null
 const ANIM_WALK := "Walk"
@@ -11,14 +11,14 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 3.0  # Mayor rango
-	move_speed = 5.6  # 80% más lento
-	attack_damage = 25  # +67% más daño
-	max_health = 180  # +50% más vida
+	move_speed = 5.6  # 80% mÃ¡s lento
+	attack_damage = 25  # +67% mÃ¡s daÃ±o
+	max_health = 180  # +50% mÃ¡s vida
 	current_health = 180
-	score_value = 30  # +50% más puntos
-	# IA más agresiva
+	score_value = 30  # +50% mÃ¡s puntos
+	# IA mÃ¡s agresiva
 	flank_chance = 0.5  # 50% probabilidad de flanquear
-	reaction_time = 0.2  # Reacciona más rápido
+	reaction_time = 0.2  # Reacciona mÃ¡s rÃ¡pido
 	_find_anim_player()
 	_setup_daggers_visual()
 	_setup_glow()  # VISUAL: Glow effect for miniboss
@@ -39,7 +39,7 @@ func _setup_glow() -> void:
 func _setup_daggers_visual() -> void:
 	var visual := get_node_or_null("VisualModel")
 	if not visual: return
-	# Añadir dagas visuales al rogue
+	# AÃ±adir dagas visuales al rogue
 	var dagger_path := "res://assets/models/characters/KayKit_Skeletons_1.1_FREE/assets/gltf/Skeleton_Dagger.gltf"
 	if ResourceLoader.exists(dagger_path):
 		var dagger_right = load(dagger_path).instantiate()
@@ -97,14 +97,14 @@ func _perform_attack() -> void:
 	var move_dir := Vector3(dir.x, 0, dir.z).normalized()
 	rotation.y = atan2(move_dir.x, move_dir.z)
 	
-	# Daño en área corto alcance
+	# DaÃ±o en Ã¡rea corto alcance
 	if multiplayer.is_server():
 		var enemies = get_tree().get_nodes_in_group("player")
 		for e in enemies:
 			if is_instance_valid(e) and e.global_position.distance_to(global_position) < attack_range:
 				if e.has_method("take_damage"): 
 					e.take_damage(attack_damage)
-					# Efecto visual de sangre/daño
+					# Efecto visual de sangre/daÃ±o
 					_blood_effect(e.global_position)
 
 func _blood_effect(pos: Vector3) -> void:

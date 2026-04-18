@@ -1,6 +1,6 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## Boss — usa Skeleton_Rogue.glb (KayKit Skeletons)
+## Boss â€” usa Skeleton_Rogue.glb (KayKit Skeletons)
 ## BOSS FINAL: Usa textura MechaGolem para diferenciarse
 
 var attack_cooldown: float = 1.0
@@ -11,19 +11,19 @@ const ANIM_WALK := "Walk"
 const ANIM_IDLE := "Idle"
 const ANIM_ATTACK := "Attack"
 
-# Índice de textura mecha para el boss (MechaGolem = 4)
+# Ãndice de textura mecha para el boss (MechaGolem = 4)
 const BOSS_MECHA_INDEX: int = 4
 
 func _ready() -> void:
-	max_health = 2000  # +100% más vida
+	max_health = 2000  # +100% mÃ¡s vida
 	super._ready()  # llama a la base que establece current_health = max_health
-	move_speed = 2.8  # 80% más lento
-	attack_damage = 80  # +60% más daño
-	score_value = 200  # +100% más puntos
-	attack_cooldown = 0.8  # Ataques más frecuentes
-	# IA más agresiva para boss
+	move_speed = 2.8  # 80% mÃ¡s lento
+	attack_damage = 80  # +60% mÃ¡s daÃ±o
+	score_value = 200  # +100% mÃ¡s puntos
+	attack_cooldown = 0.8  # Ataques mÃ¡s frecuentes
+	# IA mÃ¡s agresiva para boss
 	flank_chance = 0.6  # 60% probabilidad de flanquear
-	reaction_time = 0.15  # Reacciona muy rápido
+	reaction_time = 0.15  # Reacciona muy rÃ¡pido
 	_find_anim_player()
 	_setup_axe_visual()
 	_apply_mecha_texture_by_index(BOSS_MECHA_INDEX)  # BOSS: Textura MechaGolem fija
@@ -39,7 +39,7 @@ func _setup_axe_visual() -> void:
 		axe.rotation_degrees = Vector3(0, 90, 0)
 		axe.scale = Vector3(1.2, 1.2, 1.2)
 	
-	# El Boss tiene escala extra para parecer más intimidante
+	# El Boss tiene escala extra para parecer mÃ¡s intimidante
 	var boss_visual := get_node_or_null("VisualModel") as Node3D
 	if boss_visual:
 		boss_visual.scale *= 1.5
@@ -99,7 +99,7 @@ func _perform_attack() -> void:
 			target.take_damage(attack_damage)
 			_attack_timer = attack_cooldown
 			
-			# Golpe de boss: pequeño shake de cámara (via shockwave visual)
+			# Golpe de boss: pequeÃ±o shake de cÃ¡mara (via shockwave visual)
 			var shockwave := CSGSphere3D.new()
 			shockwave.radius = 0.1
 			var mat := StandardMaterial3D.new()

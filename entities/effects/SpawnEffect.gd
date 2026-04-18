@@ -1,5 +1,5 @@
-# SpawnEffect.gd
-# Efecto de partículas al aparecer un enemigo
+﻿# SpawnEffect.gd
+# Efecto de partÃ­culas al aparecer un enemigo
 
 extends Node3D
 
@@ -54,7 +54,7 @@ func _create_particles() -> void:
 	tween.tween_property(light, "light_energy", 0.0, 0.5)
 	tween.tween_callback(light.queue_free)
 	
-	# Destruir después de la animación
+	# Destruir despuÃ©s de la animaciÃ³n
 	await get_tree().create_timer(1.5).timeout
 	queue_free()
 

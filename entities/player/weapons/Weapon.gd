@@ -1,4 +1,4 @@
-class_name Weapon
+﻿class_name Weapon
 extends Node3D
 
 @export var projectile_scene: PackedScene
@@ -11,7 +11,7 @@ extends Node3D
 @export var normal_reload_time: float = 2.0
 @export var active_reload_window_start: float = 0.8 # Inicia a los 0.8s
 @export var active_reload_window_end: float = 1.2   # Acaba a los 1.2s
-@export var jam_penalty_time: float = 1.0           # Penalización extra si "atasca"
+@export var jam_penalty_time: float = 1.0           # PenalizaciÃ³n extra si "atasca"
 
 var current_ammo: int = max_ammo
 var is_reloading: bool = false
@@ -25,7 +25,7 @@ func _process(delta: float) -> void:
 	if is_reloading:
 		_process_reload(delta)
 
-# Función que llama el jugador cuando presiona un Numpad
+# FunciÃ³n que llama el jugador cuando presiona un Numpad
 func shoot(spawn_position: Vector3, shoot_direction: Vector3) -> bool:
 	if is_reloading or current_ammo <= 0:
 		return false
@@ -76,7 +76,7 @@ func rpc_spawn_projectile(spawn_position: Vector3, shoot_direction: Vector3) -> 
 		else:
 			proj.direction = shoot_direction
 
-# Lógica principal del Active Reload
+# LÃ³gica principal del Active Reload
 func attempt_reload() -> void:
 	if current_ammo == max_ammo: return
 	
@@ -84,21 +84,21 @@ func attempt_reload() -> void:
 		# Iniciar la recarga normal
 		is_reloading = true
 		_reload_timer = 0.0
-		print("Recargando... (Pulsa R entre ", active_reload_window_start, "s y ", active_reload_window_end, "s para Active Reload)")
+		# print("Recargando... (Pulsa R entre ", active_reload_window_start, "s y ", active_reload_window_end, "s para Active Reload)")
 	else:
-		# Intentó el active reload durante una recarga
+		# IntentÃ³ el active reload durante una recarga
 		if _reload_timer >= active_reload_window_start and _reload_timer <= active_reload_window_end:
-			print("¡ACTIVE RELOAD! Perfecto.")
+			# print("Â¡ACTIVE RELOAD! Perfecto.")
 			_finish_reload()
 		else:
-			print("¡JAM! Arma atascada...")
-			_reload_timer -= jam_penalty_time # Penalización temporal
+			# print("Â¡JAM! Arma atascada...")
+			_reload_timer -= jam_penalty_time # PenalizaciÃ³n temporal
 
 func _process_reload(delta: float) -> void:
 	_reload_timer += delta
 	
 	if _reload_timer >= normal_reload_time:
-		print("Recarga normal completada.")
+		# print("Recarga normal completada.")
 		_finish_reload()
 
 func _finish_reload() -> void:

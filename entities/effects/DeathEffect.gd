@@ -1,5 +1,5 @@
-# DeathEffect.gd
-# Efecto de partículas al morir un enemigo - explosión de huesos
+﻿# DeathEffect.gd
+# Efecto de partÃ­culas al morir un enemigo - explosiÃ³n de huesos
 
 extends Node3D
 
@@ -33,7 +33,7 @@ func _create_particles() -> void:
 	var color: Color
 	match enemy_type:
 		"mage":
-			color = Color(0.8, 0.2, 1.0, 1.0)  # Púrpura
+			color = Color(0.8, 0.2, 1.0, 1.0)  # PÃºrpura
 		"rogue":
 			color = Color(1.0, 0.5, 0.0, 1.0)  # Naranja
 		_:
@@ -42,19 +42,19 @@ func _create_particles() -> void:
 	material.color = color
 	particles.process_material = material
 	
-	# Mesh - pequeños huesos/cubos
+	# Mesh - pequeÃ±os huesos/cubos
 	var mesh = BoxMesh.new()
 	mesh.size = Vector3(0.08, 0.25, 0.08)
 	particles.draw_pass_1 = mesh
 	
 	add_child(particles)
 	
-	# Destruir después
+	# Destruir despuÃ©s
 	await get_tree().create_timer(2.5).timeout
 	queue_free()
 
 func _play_effect() -> void:
-	# Flash de muerte - usar valor muy pequeño en lugar de ZERO para evitar error de matriz no invertible
+	# Flash de muerte - usar valor muy pequeÃ±o en lugar de ZERO para evitar error de matriz no invertible
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(self, "scale", Vector3(0.001, 0.001, 0.001), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(queue_free).set_delay(0.3)

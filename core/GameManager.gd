@@ -1,4 +1,4 @@
-extends Node
+﻿extends Node
 
 ## GameManager (Autoload)
 ## Gestiona el estado global del juego (Puntos, Player, Game Over)
@@ -27,7 +27,7 @@ func add_score(amount: int) -> void:
 	
 	current_score += amount
 	score_changed.emit(current_score)
-	print("Puntos: ", current_score)
+	# print("Puntos: ", current_score)
 
 func register_player(player_node: Node) -> void:
 	player = player_node
@@ -38,13 +38,13 @@ func trigger_game_over() -> void:
 	
 	is_game_over = true
 	game_over.emit()
-	print("GAME OVER! Puntuación final: ", current_score)
+	# print("GAME OVER! PuntuaciÃ³n final: ", current_score)
 	
 	# Pausar el juego (pero permitir que el GameManager procese el input de reinicio)
 	get_tree().paused = true
 
 func restart_game() -> void:
-	print("Reiniciando juego...")
+	# print("Reiniciando juego...")
 	get_tree().paused = false
 	is_game_over = false
 	current_score = 0

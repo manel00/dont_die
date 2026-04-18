@@ -1,6 +1,6 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## Ranger — usa Skeleton_Rogue.glb (KayKit Skeletons) + Crossbow
+## Ranger â€” usa Skeleton_Rogue.glb (KayKit Skeletons) + Crossbow
 
 var attack_cooldown: float = 1.8
 var _attack_timer: float = 0.0
@@ -14,12 +14,12 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 18.0  # Mayor rango
-	move_speed = 1.4  # 80% más lento
-	max_health = 180  # +50% más vida
+	move_speed = 1.4  # 80% mÃ¡s lento
+	max_health = 180  # +50% mÃ¡s vida
 	current_health = max_health
-	attack_damage = 30  # +100% más daño
-	score_value = 60  # +50% más puntos
-	attack_cooldown = 1.4  # Ataques más frecuentes
+	attack_damage = 30  # +100% mÃ¡s daÃ±o
+	score_value = 60  # +50% mÃ¡s puntos
+	attack_cooldown = 1.4  # Ataques mÃ¡s frecuentes
 	_find_anim_player()
 	
 	# Attach Crossbow to hand (procedural for now, or just ensure it's in the scene)

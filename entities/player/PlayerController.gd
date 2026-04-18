@@ -65,6 +65,8 @@ const GRENADE_MIN_THROW_FORCE: float = 10.0
 const GRENADE_MAX_THROW_FORCE: float = 25.0
 
 # Material cacheado para efectos visuales (evitar crear nuevos cada vez)
+static var _katana_materials: Array[Material] = []
+var _shared_styloo_mat: Material = null
 static var _slash_material_cache: StandardMaterial3D = null
 static var _explosion_material_cache: StandardMaterial3D = null
 static var _ring_material_cache: StandardMaterial3D = null
@@ -117,6 +119,13 @@ func _fix_numpad_inputs() -> void:
 		if not InputMap.action_has_event(action, ev2):
 			InputMap.action_add_event(action, ev2)
 
+	if not InputMap.has_action("drop_weapon"):
+		InputMap.add_action("drop_weapon")
+	var ev_q = InputEventKey.new()
+	ev_q.keycode = KEY_Q
+	if not InputMap.action_has_event("drop_weapon", ev_q):
+		InputMap.action_add_event("drop_weapon", ev_q)
+
 func _find_anim_player() -> void:
 	if not visual_model: return
 	for child in visual_model.get_children():
@@ -164,14 +173,14 @@ func _check_fall_death(delta: float) -> void:
 		if not _is_falling:
 			_is_falling = true
 			_fall_timer = 0.0
-			print("Player falling! Starting fall death timer...")
+			# print("Player falling! Starting fall death timer...")
 		else:
 			_fall_timer += delta
 			if hud and hud.has_method("show_fall_warning"):
 				hud.show_fall_warning(FALL_DEATH_TIME - _fall_timer)
 			
 			if _fall_timer >= FALL_DEATH_TIME:
-				print("Player died from falling!")
+				# print("Player died from falling!")
 				_die_from_fall()
 	else:
 		if _is_falling:
@@ -201,7 +210,7 @@ func _die_from_fall() -> void:
 		tw.chain().tween_property(visual_model, "scale", _base_scale, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _update_timers(delta: float) -> void:
-	pass  # No cooldowns — abilities fire every frame they're pressed
+	pass  # No cooldowns â€” abilities fire every frame they're pressed
 
 func _handle_movement(delta: float) -> void:
 	if not is_on_floor():
@@ -244,6 +253,10 @@ func _handle_abilities() -> void:
 	# Ability 4: Grenade (4 or Numpad 4) - Hold to charge, release to throw
 	_handle_grenade_input()
 	
+	if Input.is_action_just_pressed("drop_weapon") or Input.is_physical_key_pressed(KEY_Q):
+		if has_weapon:
+			_drop_weapon()
+	
 
 func _handle_grenade_input() -> void:
 	if Input.is_action_just_pressed("weapon_4") or Input.is_physical_key_pressed(KEY_KP_4) or Input.is_physical_key_pressed(KEY_4):
@@ -272,9 +285,9 @@ func _spawn_trajectory_preview() -> void:
 	# Create pool of trajectory points (red spheres)
 	for i in range(20):
 		var point = CSGSphere3D.new()
-		point.radius = 0.08
-		point.radial_segments = 8
-		point.rings = 4
+		point.radius = 0.2
+		point.radial_segments = 16
+		point.rings = 8
 		
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = Color(1.0, 0.0, 0.0, 0.7)
@@ -327,11 +340,14 @@ func _throw_grenade() -> void:
 	var charge_pct: float = clamp(_grenade_charge / GRENADE_MAX_CHARGE, 0.0, 1.0)
 	var throw_force: float = lerp(GRENADE_MIN_THROW_FORCE, GRENADE_MAX_THROW_FORCE, charge_pct)
 	
+	var throw_velocity: Vector3 = last_look_dir * throw_force
+	throw_velocity.y = 8.0 * (0.5 + charge_pct * 0.5)
+	
 	# Spawn grenade
 	if multiplayer.is_server():
-		rpc_spawn_grenade.rpc(global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5, last_look_dir, throw_force)
+		rpc_spawn_grenade.rpc(global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5, throw_velocity)
 	else:
-		rpc_id(1, "rpc_request_grenade", global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5, last_look_dir, throw_force)
+		rpc_id(1, "rpc_request_grenade", global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5, throw_velocity)
 	
 	# Clear trajectory
 	_clear_trajectory_preview()
@@ -345,18 +361,17 @@ func _throw_grenade() -> void:
 	_play_shoot_sound()
 
 @rpc("any_peer")
-func rpc_request_grenade(pos: Vector3, dir: Vector3, force: float) -> void:
+func rpc_request_grenade(pos: Vector3, throw_velocity: Vector3) -> void:
 	if multiplayer.is_server():
-		rpc_spawn_grenade.rpc(pos, dir, force)
+		rpc_spawn_grenade.rpc(pos, throw_velocity)
 
 @rpc("authority", "call_local")
-func rpc_spawn_grenade(pos: Vector3, dir: Vector3, force: float) -> void:
+func rpc_spawn_grenade(pos: Vector3, throw_velocity: Vector3) -> void:
 	if grenade_scene:
 		var grenade = grenade_scene.instantiate()
 		get_tree().current_scene.add_child(grenade)
 		grenade.global_position = pos
-		grenade.direction = dir
-		grenade.speed = force
+		grenade.initial_velocity = throw_velocity
 
 func _attack_katana() -> void:
 	rpc_execute_katana.rpc(global_position, last_look_dir)
@@ -367,7 +382,7 @@ func rpc_execute_katana(pos: Vector3, l_dir: Vector3) -> void:
 	
 	if multiplayer.is_server():
 		var enemies := get_tree().get_nodes_in_group("enemies")
-		print("DEBUG Katana: checking ", enemies.size(), " enemies")
+		# print("DEBUG Katana: checking ", enemies.size(), " enemies")
 		for i in range(enemies.size()):
 			var e: Node = enemies[i]
 			if is_instance_valid(e) and e is Node3D:
@@ -376,7 +391,7 @@ func rpc_execute_katana(pos: Vector3, l_dir: Vector3) -> void:
 				var angle = to_enemy.normalized().dot(l_dir)
 				if dist < 4.5 and angle > 0.4:
 					if e.has_method("take_damage"): 
-						print("DEBUG Katana: HIT enemy=", e.name, " dist=", dist, " angle=", angle)
+						# print("DEBUG Katana: HIT enemy=", e.name, " dist=", dist, " angle=", angle)
 						e.take_damage(25)
 
 	if visual_model:
@@ -456,27 +471,18 @@ func rpc_execute_aoe(pos: Vector3) -> void:
 	
 	if multiplayer.is_server():
 		var enemies := get_tree().get_nodes_in_group("enemies")
-		print("DEBUG AOE: checking ", enemies.size(), " enemies")
+		# print("DEBUG AOE: checking ", enemies.size(), " enemies")
 		for enemy in enemies:
 			if is_instance_valid(enemy) and enemy is Node3D:
 				if enemy.global_position.distance_to(pos) < 4.0:
 					if enemy.has_method("take_damage"): 
-						print("DEBUG AOE: HIT enemy=", enemy.name, " dist=", enemy.global_position.distance_to(pos))
+						# print("DEBUG AOE: HIT enemy=", enemy.name, " dist=", enemy.global_position.distance_to(pos))
 						enemy.take_damage(40)
 
 func _fire_weapon() -> void:
 	if not has_weapon: return
 	
-	# Decrementar durabilidad
-	_weapon_uses_left -= 1
-	_current_weapon_data["uses_left"] = _weapon_uses_left
-	
-	print("Weapon used: ", _current_styloo_weapon, " (uses left: ", _weapon_uses_left, "/", _max_weapon_uses, ")")
-	
-	# Si se agotaron los usos, hacer drop
-	if _weapon_uses_left <= 0:
-		_drop_weapon()
-		return
+	# print("Weapon used: ", _current_styloo_weapon)
 	
 	# Verificar si es arma ranged o melee
 	var weapon_type_str: String = _current_weapon_data.get("type", "melee")
@@ -497,11 +503,11 @@ func _fire_ranged_projectile() -> void:
 	else:
 		rpc_id(1, "rpc_request_styloo_projectile", spawn_pos, last_look_dir, _current_styloo_weapon, _current_weapon_data)
 	
-	# Animación de lanzamiento
+	# AnimaciÃ³n de lanzamiento
 	if _anim_player and _anim_player.has_animation("CharacterArmature|Punch"):
 		_anim_player.play("CharacterArmature|Punch")
 	elif visual_model:
-		# Animación manual de lanzamiento (sin cambiar rotación/postura)
+		# AnimaciÃ³n manual de lanzamiento (sin cambiar rotaciÃ³n/postura)
 		var tw = create_tween()
 		tw.tween_property(visual_model, "scale", _base_scale * 1.3, 0.05)
 		tw.tween_property(visual_model, "scale", _base_scale, 0.1)
@@ -519,7 +525,7 @@ func _perform_melee_attack() -> void:
 
 func _drop_weapon() -> void:
 	"""Drop weapon on the ground when durability runs out."""
-	print("Weapon broken! Dropping: ", _current_styloo_weapon)
+	# print("Weapon broken! Dropping: ", _current_styloo_weapon)
 	
 	# Spawnear pickup en el suelo con usos restantes (siempre 0 en este caso)
 	if multiplayer.is_server():
@@ -549,10 +555,10 @@ func rpc_drop_weapon_pickup(pos: Vector3, weapon_type: String, weapon_data: Dict
 		var pickup = pickup_scene.instantiate()
 		pickup.weapon_type = weapon_type
 		pickup._weapon_data = weapon_data.duplicate()
-		pickup._is_dropped = true  # Marcar como droppeado (desaparecerá si no se recoge)
+		pickup._is_dropped = true  # Marcar como droppeado (desaparecerÃ¡ si no se recoge)
 		get_tree().current_scene.add_child(pickup)
-		# Droppear un poco adelante del jugador
-		pickup.global_position = pos + last_look_dir * 1.5 + Vector3(0, 0.5, 0)
+		# Droppear adelante del jugador a 3 metros
+		pickup.global_position = pos + last_look_dir * 3.0 + Vector3(0, 0.5, 0)
 
 @rpc("any_peer")
 func rpc_request_styloo_projectile(pos: Vector3, dir: Vector3, weapon_type: String, weapon_data: Dictionary) -> void:
@@ -568,13 +574,13 @@ func rpc_spawn_styloo_projectile(pos: Vector3, dir: Vector3, weapon_type: String
 			var proj = styloo_projectile_scene.instantiate()
 			scene.add_child(proj)
 			
-			# Seteamos la posición DESPUÉS de añadir al árbol para evitar el error de "is_inside_tree"
+			# Seteamos la posiciÃ³n DESPUÃ‰S de aÃ±adir al Ã¡rbol para evitar el error de "is_inside_tree"
 			proj.global_position = pos
 			proj.direction = dir.normalized()
 			proj.weapon_type = weapon_type
 			proj.damage = weapon_data.get("damage", 25)
 			
-			# Configurar comportamiento según tipo
+			# Configurar comportamiento segÃºn tipo
 			match weapon_type:
 				"shuriken1", "shuriken2", "shuriken3", "shuriken4":
 					proj.speed = 35.0
@@ -597,10 +603,10 @@ func rpc_request_styloo_attack(pos: Vector3, dir: Vector3, weapon_range: float, 
 func rpc_execute_styloo_attack(pos: Vector3, dir: Vector3, weapon_range: float, damage: int, color: Color) -> void:
 	_play_shoot_sound()
 	
-	# Daño a enemigos
+	# DaÃ±o a enemigos
 	if multiplayer.is_server():
 		var enemies := get_tree().get_nodes_in_group("enemies")
-		print("DEBUG StylooMelee: checking ", enemies.size(), " enemies")
+		# print("DEBUG StylooMelee: checking ", enemies.size(), " enemies")
 		for i in range(enemies.size()):
 			var e: Node = enemies[i]
 			if is_instance_valid(e) and e is Node3D:
@@ -609,7 +615,7 @@ func rpc_execute_styloo_attack(pos: Vector3, dir: Vector3, weapon_range: float, 
 				var angle = to_enemy.normalized().dot(dir)
 				if dist < weapon_range and angle > 0.3:
 					if e.has_method("take_damage"): 
-						print("DEBUG StylooMelee: HIT enemy=", e.name, " dist=", dist, " angle=", angle)
+						# print("DEBUG StylooMelee: HIT enemy=", e.name, " dist=", dist, " angle=", angle)
 						e.take_damage(damage)
 	
 	# Efecto visual del ataque con el color del arma
@@ -672,13 +678,13 @@ func _spawn_weapon_attack_effect(pos: Vector3, dir: Vector3, weapon_range: float
 		var timer = tree.create_timer(0.6)
 		timer.timeout.connect(trail.queue_free)
 	
-	# Animación del personaje
+	# AnimaciÃ³n del personaje
 	if visual_model:
 		var tw = create_tween()
 		tw.tween_property(visual_model, "scale", _base_scale * 1.3, 0.05)
 		tw.tween_property(visual_model, "scale", _base_scale, 0.1)
 	
-	# Animación del arma
+	# AnimaciÃ³n del arma
 	if _weapon_visual:
 		var tw_weapon = create_tween().set_parallel(true)
 		tw_weapon.tween_property(_weapon_visual, "rotation_degrees:x", _weapon_visual.rotation_degrees.x + 90, 0.15)
@@ -690,7 +696,7 @@ func rpc_request_projectile(pos: Vector3, dir: Vector3) -> void:
 
 @rpc("authority", "call_local")
 func rpc_spawn_projectile(_pos: Vector3, _dir: Vector3) -> void:
-	# Función mantenida por compatibilidad pero no usada actualmente
+	# FunciÃ³n mantenida por compatibilidad pero no usada actualmente
 	pass
 
 func _animate_visuals(_delta: float) -> void:
@@ -717,9 +723,9 @@ func _animate_visuals(_delta: float) -> void:
 			visual_model.scale = lerp(visual_model.scale, _base_scale, 10.0 * _delta)
 			visual_model.position.y = lerp(visual_model.position.y, 0.0, 10.0 * _delta)
 
-# ═══════════════════════════════════════════════════════════════════
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 #  OPTIMIZACIONES: Material Cache & Helper Functions
-# ═══════════════════════════════════════════════════════════════════
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 func _init_material_cache() -> void:
 	# Inicializar materiales cacheados una sola vez
 	if _slash_material_cache == null:
@@ -746,7 +752,7 @@ func _init_material_cache() -> void:
 func _get_slash_material() -> StandardMaterial3D:
 	if _slash_material_cache == null:
 		_init_material_cache()
-	# Crear copia para permitir modificación individual
+	# Crear copia para permitir modificaciÃ³n individual
 	var mat = _slash_material_cache.duplicate()
 	return mat
 
@@ -788,7 +794,7 @@ func _respawn() -> void:
 	global_position = _find_safe_respawn_position()
 
 func _find_safe_respawn_position() -> Vector3:
-	const MIN_SAFE_DISTANCE := 20.0  # Mínima distancia segura de enemigos
+	const MIN_SAFE_DISTANCE := 20.0  # MÃ­nima distancia segura de enemigos
 	const DEFAULT_POS := Vector3(0, 5, 0)
 	
 	# Obtener todos los enemigos
@@ -797,14 +803,14 @@ func _find_safe_respawn_position() -> Vector3:
 	# Obtener todos los puntos de spawn del jugador
 	var spawn_markers := get_tree().get_nodes_in_group("player_spawns")
 	
-	# Si no hay enemigos, usar spawn aleatorio o posición por defecto
+	# Si no hay enemigos, usar spawn aleatorio o posiciÃ³n por defecto
 	if enemies.size() == 0:
 		if spawn_markers.size() > 0:
 			var random_marker: Node3D = spawn_markers[randi() % spawn_markers.size()]
 			return random_marker.global_position
 		return DEFAULT_POS
 	
-	# Buscar el spawn más alejado de los enemigos
+	# Buscar el spawn mÃ¡s alejado de los enemigos
 	var best_spawn: Vector3 = DEFAULT_POS
 	var best_min_distance := 0.0
 	var found_safe := false
@@ -814,22 +820,22 @@ func _find_safe_respawn_position() -> Vector3:
 		var spawn_pos: Vector3 = (marker as Node3D).global_position
 		var min_distance_to_enemies := INF
 		
-		# Calcular distancia mínima a todos los enemigos desde este spawn
+		# Calcular distancia mÃ­nima a todos los enemigos desde este spawn
 		for enemy in enemies:
 			if is_instance_valid(enemy) and enemy is Node3D:
 				var dist: float = spawn_pos.distance_to((enemy as Node3D).global_position)
 				if dist < min_distance_to_enemies:
 					min_distance_to_enemies = dist
 		
-		# Si este spawn está a más de 20 metros de todos los enemigos, es seguro
+		# Si este spawn estÃ¡ a mÃ¡s de 20 metros de todos los enemigos, es seguro
 		if min_distance_to_enemies >= MIN_SAFE_DISTANCE:
-			# De los spawn seguros, elegir el que está más lejos
+			# De los spawn seguros, elegir el que estÃ¡ mÃ¡s lejos
 			if min_distance_to_enemies > best_min_distance:
 				best_min_distance = min_distance_to_enemies
 				best_spawn = spawn_pos
 				found_safe = true
 		elif not found_safe:
-			# Si aún no encontramos uno seguro, guardar el que está más lejos
+			# Si aÃºn no encontramos uno seguro, guardar el que estÃ¡ mÃ¡s lejos
 			if min_distance_to_enemies > best_min_distance:
 				best_min_distance = min_distance_to_enemies
 				best_spawn = spawn_pos
@@ -864,7 +870,7 @@ func _find_safe_respawn_position() -> Vector3:
 				best_min_distance = min_distance_to_enemies
 				best_spawn = pos
 	
-	print("Respawn seguro en: ", best_spawn, " (distancia mínima a enemigos: ", best_min_distance, ")")
+	# print("Respawn seguro en: ", best_spawn, " (distancia mÃ­nima a enemigos: ", best_min_distance, ")")
 	return best_spawn
 
 func pickup_weapon(_weapon_type: String = "sword") -> void:
@@ -872,6 +878,9 @@ func pickup_weapon(_weapon_type: String = "sword") -> void:
 	pickup_styloo_weapon("sword1", {})
 
 func pickup_styloo_weapon(weapon_type: String, weapon_data: Dictionary) -> void:
+	if has_weapon:
+		_drop_weapon()
+
 	has_weapon = true
 	_current_styloo_weapon = weapon_type
 	
@@ -897,21 +906,10 @@ func pickup_styloo_weapon(weapon_type: String, weapon_data: Dictionary) -> void:
 	_max_weapon_uses = WEAPON_USES_DEFAULT
 	weapon_cooldown = _current_weapon_data.get("cooldown", 0.35)
 	
-	print("Styloo weapon picked up: ", weapon_type, " (damage: ", _current_weapon_data.get("damage", 40), ", uses: ", _weapon_uses_left, "/", _max_weapon_uses, ")")
+	# print("Styloo weapon picked up: ", weapon_type, " (damage: ", _current_weapon_data.get("damage", 40), ", uses: ", _weapon_uses_left, "/", _max_weapon_uses, ")")
 	
 	# Mostrar arma visual en el personaje
 	_setup_styloo_weapon_visual()
-	
-	# Pickup animation
-	if _anim_player and _anim_player.has_animation("Interact"):
-		_anim_player.play("Interact")
-	elif _anim_player and _anim_player.has_animation("Pickup"):
-		_anim_player.play("Pickup")
-	elif visual_model:
-		var tw = create_tween().set_parallel(true)
-		tw.tween_property(visual_model, "position:y", 1.5, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tw.tween_property(visual_model, "rotation_degrees:y", visual_model.rotation_degrees.y + 360, 0.4)
-		tw.chain().tween_property(visual_model, "position:y", 0.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	
 	var am = get_node_or_null("/root/AudioManager")
 	if am and am.has_method("play_level_up"):
@@ -928,40 +926,44 @@ func _setup_styloo_weapon_visual() -> void:
 	
 	# Construir path al modelo
 	var weapon_path := "res://assets/models/weapons/weaponsassetspackbyStyloo/ASSETS.fbx_" + _current_styloo_weapon + ".fbx"
-	print("Loading equipped weapon: ", weapon_path)
+	# print("Loading equipped weapon: ", weapon_path)
 	
 	if ResourceLoader.exists(weapon_path):
 		_weapon_visual = load(weapon_path).instantiate()
-		print("Equipped weapon loaded: ", _weapon_visual.name)
+		# print("Equipped weapon loaded: ", _weapon_visual.name)
 		
-		# Aplicar escala y posición de mano del personaje
-		var hand_scale := Vector3(0.008, 0.008, 0.008)  # Más pequeño para mano
+		# Strip embedded animations
+		var anim_players = _weapon_visual.find_children("*", "AnimationPlayer", true)
+		for ap in anim_players:
+			ap.queue_free()
+			
+		# Aplicar escala y posiciÃ³n de mano del personaje (corregido factor x300 del importer FBX para que el arma se vea realista y amenazante)
+		var hand_scale := Vector3(0.008, 0.008, 0.008) * 300.0  # TamaÃ±o visible real
 		_weapon_visual.scale = hand_scale
-		_weapon_visual.position = Vector3(0.2, 0.5, 0.3)  # Posición en mano derecha
+		_weapon_visual.position = Vector3(0.2, 0.5, 0.3)  # PosiciÃ³n en mano derecha
 		_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
 		# Aplicar la textura correcta
 		_apply_weapon_materials_to_node(_weapon_visual)
 		visual_model.add_child(_weapon_visual)
-		print("Weapon equipped successfully")
+		# print("Weapon equipped successfully")
 	else:
-		print("WARNING: Could not load weapon, using fallback")
+		# print("WARNING: Could not load weapon, using fallback")
 		# Fallback visual
 		_weapon_visual = _create_fallback_weapon_visual()
 		visual_model.add_child(_weapon_visual)
 
-func _apply_weapon_materials_to_node(node: Node3D) -> void:
-	"""Aplica la textura original del asset pack a las armas."""
-	var tex_path := "res://assets/models/weapons/weaponsassetspackbyStyloo/3D weapons asset pack.png"
-	var tex: Texture2D = load(tex_path) if ResourceLoader.exists(tex_path) else null
-	
-	if tex:
-		var meshes := _find_mesh_instances(node)
-		for mesh in meshes:
-			var mat = StandardMaterial3D.new()
-			mat.albedo_texture = tex
-			mat.metallic = 0.3
-			mat.roughness = 0.6
-			mesh.material_override = mat
+func _apply_weapon_materials_to_node(node: Node) -> void:
+	if not _shared_styloo_mat:
+		var mat_path = "res://assets/models/weapons/weaponsassetspackbyStyloo/textures/Textures.mat"
+		if ResourceLoader.exists(mat_path):
+			_shared_styloo_mat = load(mat_path)
+			
+	if node is MeshInstance3D and _shared_styloo_mat:
+		for i in range(node.mesh.get_surface_count()):
+			node.set_surface_override_material(i, _shared_styloo_mat)
+				
+	for child in node.get_children():
+		_apply_weapon_materials_to_node(child)
 
 func _find_mesh_instances(node: Node) -> Array[MeshInstance3D]:
 	var result: Array[MeshInstance3D] = []
@@ -975,7 +977,7 @@ func _create_fallback_weapon_visual() -> Node3D:
 	var container = Node3D.new()
 	container.name = "FallbackWeapon"
 	
-	# Mesh según tipo
+	# Mesh segÃºn tipo
 	var mesh: MeshInstance3D = MeshInstance3D.new()
 	var color: Color = _current_weapon_data.get("color", Color.CYAN)
 	

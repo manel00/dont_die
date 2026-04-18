@@ -1,5 +1,5 @@
-# HitEffect.gd
-# Efecto de partículas al recibir daño
+﻿# HitEffect.gd
+# Efecto de partÃ­culas al recibir daÃ±o
 
 extends Node3D
 
@@ -39,6 +39,6 @@ func _create_particles() -> void:
 	
 	add_child(particles)
 	
-	# Destruir rápido
+	# Destruir rÃ¡pido
 	await get_tree().create_timer(0.6).timeout
 	queue_free()

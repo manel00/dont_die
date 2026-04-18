@@ -1,4 +1,4 @@
-extends Area3D
+﻿extends Area3D
 
 class_name LootItem
 
@@ -7,7 +7,7 @@ class_name LootItem
 func _ready() -> void:
 	# FIX: Asegurar collision layers correctas para detectar CharacterBody3D del jugador
 	# Layer 1 = entorno/jugador, configurar monitoreo
-	collision_layer = 0   # El loot no forma parte de ninguna capa física
+	collision_layer = 0   # El loot no forma parte de ninguna capa fÃ­sica
 	collision_mask = 1    # Detectar layer 1 (jugadores/personajes)
 	monitoring = true
 	set_deferred("monitorable", false)
@@ -48,5 +48,5 @@ func _on_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("player"):
 		return
 	if body.has_method("take_damage"):
-		body.take_damage(-heal_value)  # Negativo = curación
+		body.take_damage(-heal_value)  # Negativo = curaciÃ³n
 	queue_free()

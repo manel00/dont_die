@@ -1,4 +1,4 @@
-## BotPlayer.gd
+﻿## BotPlayer.gd
 ## AI-controlled ally that follows the human player(s) and auto-shoots enemies.
 ## Uses the same weapons system as PlayerController.
 
@@ -6,17 +6,17 @@ class_name BotPlayer
 extends CharacterBody3D
 
 @export_category("Bot Stats")
-@export var max_health: int = 150  # +50% más vida
+@export var max_health: int = 150  # +50% mÃ¡s vida
 @export var move_speed: float = 2.34  # +30%
 @export var attack_range: float = 15.0  # Mayor rango
-@export var fire_rate: float = 0.28  # +25% más rápido
+@export var fire_rate: float = 0.28  # +25% mÃ¡s rÃ¡pido
 @export var gravity: float = 20.0
 
 # IA mejorada
 @export_category("Bot AI")
 @export var kite_speed: float = 2.86  # +30%
 @export var retreat_health_pct: float = 0.25  # Retirarse al 25% vida
-@export var optimal_distance: float = 10.0  # Distancia óptima del enemigo
+@export var optimal_distance: float = 10.0  # Distancia Ã³ptima del enemigo
 @export var dodge_enabled: bool = true
 @export var support_ally: bool = true  # Ayudar a aliados en peligro
 
@@ -26,7 +26,9 @@ var _target_enemy: Node3D = null
 var _follow_target: Node3D = null  # The human player to follow
 var nav_agent: NavigationAgent3D
 var visual_model: Node3D
-var active_weapon: Weapon
+var active_weapon: Node3D
+
+@onready var bot_projectile_scene := preload("res://entities/player/weapons/StylooRangedProjectile.tscn")
 
 # IA avanzada
 enum BotState { IDLE, FOLLOW, CHASE, KITE, RETREAT, SUPPORT }
@@ -53,9 +55,9 @@ func _ready() -> void:
 	
 	visual_model = get_node_or_null("VisualModel")
 	
-	# Find weapon
+	# Find weapon (legacy)
 	for child in get_children():
-		if child is Weapon:
+		if child.name == "Weapon":
 			active_weapon = child
 			break
 	
@@ -108,7 +110,7 @@ func _update_targets() -> void:
 		if d > 30.0:  # Ignorar enemigos muy lejanos
 			continue
 		
-		# Calcular puntuación de prioridad (menor = mejor)
+		# Calcular puntuaciÃ³n de prioridad (menor = mejor)
 		var score = d
 		# Priorizar enemigos peligrosos
 		if enemy.has_method("get_max_health"):
@@ -162,7 +164,7 @@ func _update_targets() -> void:
 				_support_target = bot
 
 func _is_targeting_ally(enemy: Node3D) -> bool:
-	# Verificar si el enemigo está atacando a un aliado
+	# Verificar si el enemigo estÃ¡ atacando a un aliado
 	var enemy_target = enemy.get("target")
 	if enemy_target and enemy_target is Node3D:
 		if enemy_target.is_in_group("bots"):
@@ -190,11 +192,11 @@ func _evaluate_bot_state() -> void:
 			_bot_state = BotState.SUPPORT
 			return
 	
-	# Kiting: mantener distancia óptima
+	# Kiting: mantener distancia Ã³ptima
 	if _target_enemy:
 		var dist_to_enemy = global_position.distance_to(_target_enemy.global_position)
 		if dist_to_enemy < optimal_distance * 0.6:
-			# Muy cerca - hacer kiting hacia atrás
+			# Muy cerca - hacer kiting hacia atrÃ¡s
 			_bot_state = BotState.KITE
 			return
 		elif dist_to_enemy > attack_range * 1.2:
@@ -202,7 +204,7 @@ func _evaluate_bot_state() -> void:
 			_bot_state = BotState.CHASE
 			return
 		else:
-			# En rango óptimo - mantener posición
+			# En rango Ã³ptimo - mantener posiciÃ³n
 			_bot_state = BotState.CHASE
 	else:
 		_bot_state = BotState.FOLLOW
@@ -224,7 +226,7 @@ func _move(delta: float) -> void:
 				var to_enemy = _target_enemy.global_position - global_position
 				var retreat_dir = -Vector3(to_enemy.x, 0, to_enemy.z).normalized()
 				
-				# Añadir movimiento lateral para evitar ser alcanzado
+				# AÃ±adir movimiento lateral para evitar ser alcanzado
 				var strafe = retreat_dir.cross(Vector3.UP) * (1 if randf() > 0.5 else -1)
 				var move_dir = (retreat_dir * 0.7 + strafe * 0.3).normalized()
 				
@@ -236,7 +238,7 @@ func _move(delta: float) -> void:
 			# Ir hacia el jugador para protegerse
 			if _follow_target:
 				move_to_node = _follow_target
-				actual_speed = kite_speed  # Más rápido al retirarse
+				actual_speed = kite_speed  # MÃ¡s rÃ¡pido al retirarse
 			
 		BotState.SUPPORT:
 			# Ir hacia el aliado que necesita ayuda
@@ -272,7 +274,7 @@ func _move(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, actual_speed * delta * 5.0)
 		velocity.z = move_toward(velocity.z, 0.0, actual_speed * delta * 5.0)
 	
-	# Evasión: detectar proyectiles entrantes
+	# EvasiÃ³n: detectar proyectiles entrantes
 	if dodge_enabled:
 		_try_dodge(delta)
 	
@@ -287,35 +289,73 @@ func _try_dodge(delta: float) -> void:
 		var proj := p as Node3D
 		var proj_pos := proj.global_position
 		var dist := global_position.distance_to(proj_pos)
-		if dist < 5.0:  # Proyectil muy cerca
+		if dist < 6.0:  # Proyectil muy cerca (aumentado para esquivar mejor)
 			var proj_dir: Vector3 = proj.get("direction") if proj.get("direction") != null else Vector3.FORWARD
-			# Calcular dirección de evasión perpendicular
+			# Calcular direcciÃ³n de evasiÃ³n perpendicular
 			var dodge_dir := proj_dir.cross(Vector3.UP).normalized()
 			if dodge_dir == Vector3.ZERO:
 				dodge_dir = Vector3(randf() - 0.5, 0, randf() - 0.5).normalized()
 			
 			_dodge_direction = dodge_dir
-			_dodge_timer = 0.5
+			_dodge_timer = 0.8  # Esquiva durante mÃ¡s tiempo
 			break
 	
-	# Aplicar dodge si está activo
+	# Aplicar dodge si estÃ¡ activo
 	if _dodge_timer > 0:
-		velocity.x += _dodge_direction.x * 15.0 * delta
-		velocity.z += _dodge_direction.z * 15.0 * delta
+		velocity.x += _dodge_direction.x * 18.0 * delta
+		velocity.z += _dodge_direction.z * 18.0 * delta
 
 func _try_shoot() -> void:
-	if _fire_timer > 0.0 or not _target_enemy or not active_weapon:
+	if _fire_timer > 0.0 or not _target_enemy:
 		return
+		
 	var dist: float = global_position.distance_to(_target_enemy.global_position)
 	if dist > attack_range:
 		return
 	
 	_fire_timer = fire_rate
 	var shoot_dir := ((_target_enemy.global_position + Vector3(0, 1.0, 0)) - (global_position + Vector3(0, 1.0, 0))).normalized()
-	shoot_dir.y = 0.0
 	shoot_dir = shoot_dir.normalized()
 	var muzzle_pos := global_position + shoot_dir * 1.5 + Vector3(0, 1.0, 0)
-	active_weapon.shoot(muzzle_pos, shoot_dir)
+	
+	if multiplayer.is_server():
+		rpc_spawn_bot_projectile.rpc(muzzle_pos, shoot_dir)
+	else:
+		rpc_id(1, "rpc_request_bot_projectile", muzzle_pos, shoot_dir)
+		
+	# Play sound
+	var am = get_node_or_null("/root/AudioManager")
+	if am and am.has_method("play_shoot"):
+		am.play_shoot()
+
+@rpc("any_peer")
+func rpc_request_bot_projectile(pos: Vector3, dir: Vector3) -> void:
+	if multiplayer.is_server():
+		rpc_spawn_bot_projectile.rpc(pos, dir)
+
+@rpc("authority", "call_local")
+func rpc_spawn_bot_projectile(pos: Vector3, dir: Vector3) -> void:
+	if bot_projectile_scene:
+		var scene = get_tree().current_scene
+		if scene:
+			var proj = bot_projectile_scene.instantiate()
+			scene.add_child(proj)
+			proj.global_position = pos
+			proj.direction = dir
+			proj.weapon_type = "shuriken4" # Use cool shuriken
+			proj.damage = max_health / 5 # Escala con su vida
+			proj.speed = 30.0
+			proj.life_time = 2.0
+
+# INTELIGENCIA AUTÃ“NOMA: Los bots recogen botÃ­n para hacerse mÃ¡s fuertes
+func pickup_styloo_weapon(weapon_name: String, data: Dictionary) -> void:
+	# El bot se hace mÃ¡s poderoso en lugar de cambiar de modelo complejo
+	max_health += 50
+	current_health = max_health
+	fire_rate = max(0.1, fire_rate - 0.05)
+
+func pickup_weapon(weapon_type: String) -> void:
+	pickup_styloo_weapon(weapon_type, {})
 
 func _find_anim_player() -> void:
 	if not visual_model: return

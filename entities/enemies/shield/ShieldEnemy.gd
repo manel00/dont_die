@@ -1,6 +1,6 @@
-extends EnemyBase
+﻿extends EnemyBase
 
-## ShieldEnemy — usa Skeleton_Warrior.glb (KayKit Skeletons) + Shield
+## ShieldEnemy â€” usa Skeleton_Warrior.glb (KayKit Skeletons) + Shield
 
 var attack_cooldown: float = 1.2
 var _attack_timer: float = 0.0
@@ -11,12 +11,12 @@ const ANIM_IDLE := "Idle"
 const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
-	max_health = 400 # +60% más tanky
+	max_health = 400 # +60% mÃ¡s tanky
 	super._ready()
-	move_speed = 0.8  # 80% más lento
-	attack_damage = 35  # +75% más daño
-	score_value = 80  # +60% más puntos
-	attack_cooldown = 1.0  # Ataques más frecuentes
+	move_speed = 0.8  # 80% mÃ¡s lento
+	attack_damage = 35  # +75% mÃ¡s daÃ±o
+	score_value = 80  # +60% mÃ¡s puntos
+	attack_cooldown = 1.0  # Ataques mÃ¡s frecuentes
 	_find_anim_player()
 	_setup_shield_visual()
 
