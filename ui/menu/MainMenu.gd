@@ -6,6 +6,8 @@ extends Control
 @onready var solo_button: Button = $MenuContainer/Card/VBoxContainer/SoloButton
 @onready var map_arena_button: Button = $MenuContainer/Card/VBoxContainer/MapSection/ArenaButton
 @onready var map_sagrera_button: Button = $MenuContainer/Card/VBoxContainer/MapSection/SagreraButton
+@onready var enemy_skeletons_button: Button = $MenuContainer/Card/VBoxContainer/EnemyModeSection/SkeletonsButton
+@onready var enemy_mechas_button: Button = $MenuContainer/Card/VBoxContainer/EnemyModeSection/MechasButton
 @onready var status_label: Label = $MenuContainer/Card/VBoxContainer/StatusLabel
 
 func _ready() -> void:
@@ -15,9 +17,12 @@ func _ready() -> void:
 	solo_button.pressed.connect(_on_solo_pressed)
 	map_arena_button.pressed.connect(_on_arena_selected)
 	map_sagrera_button.pressed.connect(_on_sagrera_selected)
+	enemy_skeletons_button.pressed.connect(_on_skeletons_selected)
+	enemy_mechas_button.pressed.connect(_on_mechas_selected)
 	
 	# Default selection visual
 	_update_map_selection_visual()
+	_update_enemy_selection_visual()
 	
 	if NetworkManager:
 		NetworkManager.connected_to_server.connect(_on_connected_ok)
@@ -95,6 +100,14 @@ func _on_sagrera_selected() -> void:
 	GameManager.selected_map_path = GameManager.MAP_SAGRERA
 	_update_map_selection_visual()
 
+func _on_skeletons_selected() -> void:
+	GameManager.enemy_mode = "skeletons"
+	_update_enemy_selection_visual()
+
+func _on_mechas_selected() -> void:
+	GameManager.enemy_mode = "mechas"
+	_update_enemy_selection_visual()
+
 func _update_map_selection_visual() -> void:
 	var is_arena = GameManager.selected_map_path == GameManager.MAP_ARENA
 	map_arena_button.modulate = Color(1, 1, 1, 1) if is_arena else Color(0.5, 0.5, 0.5, 1)
@@ -102,6 +115,14 @@ func _update_map_selection_visual() -> void:
 	
 	map_arena_button.text = "● ARENA CLÁSICA" if is_arena else "○ ARENA CLÁSICA"
 	map_sagrera_button.text = "● LA SAGRERA" if !is_arena else "○ LA SAGRERA"
+
+func _update_enemy_selection_visual() -> void:
+	var is_skeletons = GameManager.enemy_mode == "skeletons"
+	enemy_skeletons_button.modulate = Color(1, 1, 1, 1) if is_skeletons else Color(0.5, 0.5, 0.5, 1)
+	enemy_mechas_button.modulate = Color(1, 1, 1, 1) if !is_skeletons else Color(0.5, 0.5, 0.5, 1)
+	
+	enemy_skeletons_button.text = "● MODO ESQUELETOS" if is_skeletons else "○ MODO ESQUELETOS"
+	enemy_mechas_button.text = "● MODO MECHAS" if !is_skeletons else "○ MODO MECHAS"
 
 func _start_game() -> void:
 	get_tree().change_scene_to_file(GameManager.selected_map_path)

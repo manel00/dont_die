@@ -557,8 +557,8 @@ func rpc_drop_weapon_pickup(pos: Vector3, weapon_type: String, weapon_data: Dict
 		pickup._weapon_data = weapon_data.duplicate()
 		pickup._is_dropped = true  # Marcar como droppeado (desaparecerÃ¡ si no se recoge)
 		get_tree().current_scene.add_child(pickup)
-		# Droppear adelante del jugador a 3 metros
-		pickup.global_position = pos + last_look_dir * 3.0 + Vector3(0, 0.5, 0)
+		# Droppear detrás del jugador para evitar que la vuelva a coger al seguir corriendo hacia adelante
+		pickup.global_position = pos - last_look_dir * 1.5 + Vector3(0, 0.5, 0)
 
 @rpc("any_peer")
 func rpc_request_styloo_projectile(pos: Vector3, dir: Vector3, weapon_type: String, weapon_data: Dictionary) -> void:

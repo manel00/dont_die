@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 
 ## GameManager (Autoload)
 ## Gestiona el estado global del juego (Puntos, Player, Game Over)
@@ -10,6 +10,7 @@ var current_score: int = 0
 var is_game_over: bool = false
 var player: Node = null
 var solo_mode: bool = false  # true = single player + bots, false = LAN
+var enemy_mode: String = "skeletons"  # "skeletons" | "mechas"
 var selected_map_path: String = "res://levels/arena/Arena.tscn"
 
 const MAP_ARENA = "res://levels/arena/Arena.tscn"

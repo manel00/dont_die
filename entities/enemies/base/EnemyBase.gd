@@ -51,9 +51,21 @@ const MECHA_TEXTURES: Array[String] = [
 	"res://assets/models/characters/Enemies_mecha/ReconBot.png"
 ]
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 #  PERFORMANCE OPTIMIZATION
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
+const MECHA_MODELS: Array[String] = [
+	"res://assets/models/characters/Enemies_mecha/Arachnoid.obj",
+	"res://assets/models/characters/Enemies_mecha/Companion-bot.obj",
+	"res://assets/models/characters/Enemies_mecha/FieldFighter.obj",
+	"res://assets/models/characters/Enemies_mecha/Mecha01.obj",
+	"res://assets/models/characters/Enemies_mecha/MechaGolem.obj",
+	"res://assets/models/characters/Enemies_mecha/MechaTrooper.obj",
+	"res://assets/models/characters/Enemies_mecha/MobileStorageBot.obj",
+	"res://assets/models/characters/Enemies_mecha/QuadrupedTank.obj",
+	"res://assets/models/characters/Enemies_mecha/ReconBot.obj"
+]
+
 const DISTANCE_CULLING_THRESHOLD: float = 50.0  # No AI updates beyond this
 const ANIMATION_UPDATE_INTERVAL: float = 0.2    # Update animation every 0.2s
 const SHADOW_CULLING_DISTANCE: float = 40.0   # Disable shadows beyond this
@@ -66,11 +78,12 @@ static var _player_cache: Array[Node] = []
 static var _player_cache_timer: float = 0.0
 static var _player_cache_interval: float = 0.5
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 #  MATERIAL CACHE - Reutilizar materiales para evitar lag
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 static var _mecha_materials: Array[StandardMaterial3D] = []
 static var _mecha_textures: Array[Texture2D] = []
+static var _mecha_model_assets: Array = []
 static var _materials_loaded: bool = false
 
 func _ready() -> void:
@@ -592,55 +605,36 @@ func _ensure_materials_loaded() -> void:
 	if _materials_loaded:
 		return
 	
-	# Pre-cargar todas las texturas y materiales una sola vez
+	# Pre-cargar todas las texturas, modelos y materiales una sola vez
 	for i in range(MECHA_TEXTURES.size()):
 		var tex = load(MECHA_TEXTURES[i]) as Texture2D
-		if tex:
+		var model = load(MECHA_MODELS[i])
+		if tex and model:
 			_mecha_textures.append(tex)
+			_mecha_model_assets.append(model)
 			# Crear material compartido
 			var mat := StandardMaterial3D.new()
 			mat.albedo_texture = tex
 			mat.emission_enabled = true
-			mat.emission = Color(0.5, 0.5, 0.5)
-			mat.emission_energy_multiplier = 0.3
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.emission = Color(0.2, 0.2, 0.2)
+			mat.emission_energy_multiplier = 0.5
+			# Mallas sÃ³lidas, quitamos holograma
 			_mecha_materials.append(mat)
 	
 	_materials_loaded = true
-	# print("EnemyBase: Pre-loaded ", _mecha_materials.size(), " mecha materials for optimization")
 
 func _apply_random_mecha_texture() -> void:
-	"""Aplica una textura mecha aleatoria como decal/emissive overlay en el modelo visual."""
+	"""Aplica modelo mecha aleatorio ocultando el hueso/skeleton antiguo."""
 	_ensure_materials_loaded()
-	
-	var visual := _visual_model
-	if not visual:
-		return
 	
 	if _mecha_materials.is_empty():
 		return
-	
-	# Seleccionar Ã­ndice aleatorio
+		
 	var idx := randi() % _mecha_materials.size()
-	
-	# Crear un Sprite3D que actÃºe como overlay de textura mecha
-	var mecha_decal := Sprite3D.new()
-	mecha_decal.name = "MechaTextureOverlay"
-	mecha_decal.texture = _mecha_textures[idx]
-	mecha_decal.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	mecha_decal.pixel_size = 0.02
-	mecha_decal.position = Vector3(0, 1.0, 0.3)  # Sobre el pecho del enemigo
-	mecha_decal.scale = Vector3(1.5, 1.5, 1)
-	mecha_decal.modulate = Color(1, 1, 1, 0.9)
-	mecha_decal.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	
-	# Usar material cacheado (reutilizado)
-	mecha_decal.material_override = _mecha_materials[idx]
-	
-	visual.add_child(mecha_decal)
+	_apply_mecha_texture_by_index(idx)
 
 func _apply_mecha_texture_by_index(index: int) -> void:
-	"""Aplica una textura mecha especÃ­fica por Ã­ndice."""
+	"""Aplica un modelo mecha especÃ­fico por Ã­ndice."""
 	_ensure_materials_loaded()
 	
 	if index < 0 or index >= _mecha_materials.size():
@@ -651,19 +645,33 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 	if not visual:
 		return
 	
-	var mecha_decal := Sprite3D.new()
-	mecha_decal.name = "MechaTextureOverlay"
-	mecha_decal.texture = _mecha_textures[index]
-	mecha_decal.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	mecha_decal.pixel_size = 0.02
-	mecha_decal.position = Vector3(0, 1.0, 0.3)
-	mecha_decal.scale = Vector3(1.5, 1.5, 1)
-	mecha_decal.modulate = Color(1, 1, 1, 0.9)
+	# Ocultar todos los mesh de los esqueletos en el skeleton3d existente
+	for child in visual.find_children("*", "MeshInstance3D", true, false):
+		child.hide()
 	
-	# Usar material cacheado (reutilizado)
-	mecha_decal.material_override = _mecha_materials[index]
+	var res = _mecha_model_assets[index]
+	var mecha_node: Node3D = null
 	
-	visual.add_child(mecha_decal)
+	if res is PackedScene:
+		mecha_node = res.instantiate()
+	elif res is Mesh:
+		mecha_node = MeshInstance3D.new()
+		mecha_node.mesh = res
+		
+	if mecha_node:
+		visual.add_child(mecha_node)
+		# Aplicar el material adecuado
+		if mecha_node is MeshInstance3D:
+			mecha_node.set_surface_override_material(0, _mecha_materials[index])
+		else:
+			for mi in mecha_node.find_children("*", "MeshInstance3D", true, false):
+				mi.set_surface_override_material(0, _mecha_materials[index])
+				
+		# Ajustar escala a su tamaño natural de Godot (1.0)
+		mecha_node.scale = Vector3(1.0, 1.0, 1.0)
+		mecha_node.position = Vector3(0, 0, 0)
+		# Rotar si estÃ¡ de espaldas (Godot mira hacia Z-)
+		mecha_node.rotation_degrees = Vector3(0, 180, 0)
 
 func _animate_visuals(delta: float) -> void:
 	# Escala fija - no permitir cambios dinÃ¡micos de tamaÃ±o

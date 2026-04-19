@@ -1,4 +1,4 @@
-﻿## BotPlayer.gd
+## BotPlayer.gd
 ## AI-controlled ally that follows the human player(s) and auto-shoots enemies.
 ## Uses the same weapons system as PlayerController.
 
@@ -61,6 +61,9 @@ func _ready() -> void:
 			active_weapon = child
 			break
 	
+	if GameManager.enemy_mode == "mechas":
+		_apply_companion_bot_texture()
+	
 	nav_agent = NavigationAgent3D.new()
 	nav_agent.path_desired_distance = 0.5
 	nav_agent.target_desired_distance = 2.0
@@ -78,6 +81,42 @@ func _setup_bot_weapon_visual() -> void:
 		blade.position = Vector3(0.3, 0.7, -0.4)
 		blade.rotation_degrees = Vector3(0, 90, 0)
 
+func _apply_companion_bot_texture() -> void:
+	var tex = load("res://assets/models/characters/Enemies_mecha/Companion-bot.png") as Texture2D
+	var obj_mesh = load("res://assets/models/characters/Enemies_mecha/Companion-bot.obj")
+	
+	if tex and obj_mesh:
+		var mat = StandardMaterial3D.new()
+		mat.albedo_texture = tex
+		mat.emission_enabled = true
+		mat.emission = Color(0.2, 0.8, 1.0)
+		mat.emission_energy_multiplier = 0.8
+		
+		var visual := get_node_or_null("VisualModel")
+		if not visual: return
+		
+		# Ocultar todos los mesh de los esqueletos originales
+		for child in visual.find_children("*", "MeshInstance3D", true, false):
+			child.hide()
+			
+		var mecha_node: Node3D = null
+		if obj_mesh is PackedScene:
+			mecha_node = obj_mesh.instantiate()
+		elif obj_mesh is Mesh:
+			mecha_node = MeshInstance3D.new()
+			mecha_node.mesh = obj_mesh
+			
+		if mecha_node:
+			visual.add_child(mecha_node)
+			if mecha_node is MeshInstance3D:
+				mecha_node.set_surface_override_material(0, mat)
+			else:
+				for mi in mecha_node.find_children("*", "MeshInstance3D", true, false):
+					mi.set_surface_override_material(0, mat)
+			
+			mecha_node.scale = Vector3(1.0, 1.0, 1.0)
+			mecha_node.position = Vector3(0, 0, 0)
+			mecha_node.rotation_degrees = Vector3(0, 180, 0)
 func _physics_process(delta: float) -> void:
 	if not multiplayer.is_server():
 		return

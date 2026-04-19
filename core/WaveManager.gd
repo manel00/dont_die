@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 
 signal wave_started(wave_number: int)
 signal wave_cleared(wave_number: int)
@@ -227,6 +227,10 @@ func _spawn_at_pos(scene: PackedScene, pos: Vector3) -> void:
 		return
 	
 	var enemy = scene.instantiate()
+	
+	if GameManager.enemy_mode == "mechas":
+		_apply_mecha_rules(enemy)
+
 	var enemies_node: Node3D
 	var tree := get_tree()
 	if not tree or not tree.current_scene:
@@ -291,3 +295,37 @@ func get_wave_progress() -> Dictionary:
 		"active": active_enemies,
 		"in_progress": _wave_in_progress
 	}
+
+func _apply_mecha_rules(enemy: Node) -> void:
+	if "max_health" in enemy:
+		enemy.max_health = 1000
+	if "current_health" in enemy:
+		enemy.current_health = 1000
+		
+	var is_minion = false
+	if scene_file_path_matches(enemy, minion_scene):
+		is_minion = true
+
+	if is_minion:
+		if randf() < 0.4:
+			enemy.scale = Vector3(1.6, 1.6, 1.6)
+			if "move_speed" in enemy:
+				enemy.move_speed *= 0.6
+			enemy.ready.connect(func():
+				if enemy.has_method("_apply_mecha_texture_by_index"):
+					enemy._apply_mecha_texture_by_index(7) # QuadrupedTank
+			, CONNECT_ONE_SHOT)
+		else:
+			enemy.ready.connect(func():
+				if enemy.has_method("_apply_random_mecha_texture"):
+					enemy._apply_random_mecha_texture()
+			, CONNECT_ONE_SHOT)
+	else:
+		enemy.ready.connect(func():
+			if enemy.has_method("_apply_random_mecha_texture"):
+				enemy._apply_random_mecha_texture()
+		, CONNECT_ONE_SHOT)
+
+func scene_file_path_matches(node: Node, scene: PackedScene) -> bool:
+	if scene == null: return false
+	return node.scene_file_path == scene.resource_path
