@@ -58,6 +58,8 @@ var _anim_player: AnimationPlayer = null
 
 # Grenade system
 var _grenade_charge: float = 0.0
+var _grenade_start_dir: Vector3 = Vector3.FORWARD
+var _grenade_start_charge: float = 0.0
 var _is_charging_grenade: bool = false
 var _grenade_trajectory_points: Array[Node3D] = []
 const GRENADE_MAX_CHARGE: float = 2.0
@@ -65,6 +67,7 @@ const GRENADE_MIN_THROW_FORCE: float = 10.0
 const GRENADE_MAX_THROW_FORCE: float = 25.0
 
 # Material cacheado para efectos visuales (evitar crear nuevos cada vez)
+@warning_ignore("unused_variable")
 static var _katana_materials: Array[Material] = []
 var _shared_styloo_mat: Material = null
 static var _slash_material_cache: StandardMaterial3D = null
@@ -90,6 +93,11 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	current_health = max_health
 	add_to_group("player")
+	
+	# Configurar capas de colisión para que el pickup pueda detectarnos
+	collision_layer = 1  # Capa de jugadores
+	collision_mask = 1 | 2 | 4  # Colisionar con mundo, pickupeables, enemigos
+	
 	visual_model = get_node_or_null("VisualModel")
 	_find_anim_player()
 	
@@ -297,19 +305,21 @@ func _spawn_trajectory_preview() -> void:
 		point.material = mat
 		
 		point.visible = false
-		get_tree().current_scene.add_child(point)
-		_grenade_trajectory_points.append(point)
+		var scene := get_tree().current_scene
+		if scene:
+			scene.add_child(point)
+			_grenade_trajectory_points.append(point)
 
 func _update_trajectory_preview() -> void:
 	if _grenade_trajectory_points.is_empty():
 		return
-	
+
 	var charge_pct: float = _grenade_charge / GRENADE_MAX_CHARGE
 	var throw_force: float = lerp(GRENADE_MIN_THROW_FORCE, GRENADE_MAX_THROW_FORCE, charge_pct)
-	
-	# Usar la dirección real del modelo visual para la trayectoria
+
+	# Usar la dirección actual del jugador
 	var throw_dir := _get_look_direction()
-	
+
 	var start_pos: Vector3 = global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5
 	var velocity: Vector3 = throw_dir * throw_force
 	velocity.y = 8.0 * (0.5 + charge_pct * 0.5)  # Higher arc with more charge
@@ -338,39 +348,43 @@ func _clear_trajectory_preview() -> void:
 	_grenade_trajectory_points.clear()
 
 func _get_look_direction() -> Vector3:
-	# Usar last_look_dir que es la dirección basada en el input del jugador
+	# Usar la rotación Y del visual_model para obtener la dirección exacta donde apunta
+	if visual_model:
+		var rot_y := visual_model.rotation.y
+		return Vector3(sin(rot_y), 0, cos(rot_y)).normalized()
+	# Fallback a last_look_dir si no hay visual_model
 	if last_look_dir.length() > 0.1:
 		return last_look_dir.normalized()
 	return Vector3.FORWARD
 
 func _throw_grenade() -> void:
 	_is_charging_grenade = false
-	
+
 	var charge_pct: float = clamp(_grenade_charge / GRENADE_MAX_CHARGE, 0.0, 1.0)
 	var throw_force: float = lerp(GRENADE_MIN_THROW_FORCE, GRENADE_MAX_THROW_FORCE, charge_pct)
-	
-	# Usar la dirección real del modelo visual para lanzar
+
+	# Capturar dirección y posición exactas en el momento del lanzamiento
 	var throw_dir := _get_look_direction()
-	
+	var spawn_pos := global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5
+
 	var throw_velocity: Vector3 = throw_dir * throw_force
 	throw_velocity.y = 8.0 * (0.5 + charge_pct * 0.5)
-	
+
 	# Spawn grenade
 	if multiplayer.is_server():
-		rpc_spawn_grenade.rpc(global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5, throw_velocity)
+		rpc_spawn_grenade.rpc(spawn_pos, throw_velocity)
 	else:
-		rpc_id(1, "rpc_request_grenade", global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5, throw_velocity)
+		rpc_id(1, "rpc_request_grenade", spawn_pos, throw_velocity)
 	
 	# Clear trajectory
 	_clear_trajectory_preview()
 	
-	# Animation - guardar valor inicial para evitar deformación acumulativa
+	# Animación de lanzamiento - solo escala, no rotación para evitar caer del mapa
 	if visual_model:
-		var initial_rot_x := visual_model.rotation_degrees.x
 		var tw = create_tween().set_parallel(true)
-		tw.tween_property(visual_model, "rotation_degrees:x", initial_rot_x + 45, 0.1)
-		tw.chain().tween_property(visual_model, "rotation_degrees:x", initial_rot_x, 0.2)
-	
+		tw.tween_property(visual_model, "scale", _base_scale * 1.2, 0.1)
+		tw.chain().tween_property(visual_model, "scale", _base_scale, 0.2)
+
 	_play_shoot_sound()
 
 @rpc("any_peer")
@@ -381,8 +395,11 @@ func rpc_request_grenade(pos: Vector3, throw_velocity: Vector3) -> void:
 @rpc("authority", "call_local")
 func rpc_spawn_grenade(pos: Vector3, throw_velocity: Vector3) -> void:
 	if grenade_scene:
+		var scene := get_tree().current_scene
+		if not scene:
+			return
 		var grenade = grenade_scene.instantiate()
-		get_tree().current_scene.add_child(grenade)
+		scene.add_child(grenade)
 		grenade.global_position = pos
 		grenade.initial_velocity = throw_velocity
 
@@ -440,8 +457,11 @@ func rpc_request_fireball(pos: Vector3, dir: Vector3) -> void:
 
 @rpc("authority", "call_local")
 func rpc_spawn_fireball(pos: Vector3, dir: Vector3) -> void:
+	var scene := get_tree().current_scene
+	if not scene:
+		return
 	var proj = fireball_scene.instantiate()
-	get_tree().current_scene.add_child(proj)
+	scene.add_child(proj)
 	proj.global_position = pos
 	proj.direction = dir
 
@@ -563,14 +583,16 @@ func rpc_request_weapon_drop(pos: Vector3, weapon_type: String, weapon_data: Dic
 @rpc("authority", "call_local")
 func rpc_drop_weapon_pickup(pos: Vector3, weapon_type: String, weapon_data: Dictionary) -> void:
 	"""Spawn a dropped weapon pickup on the ground."""
+	var scene := get_tree().current_scene
+	if not scene:
+		return
 	var pickup_scene = load("res://entities/interactables/StylooWeaponPickup.tscn")
 	if pickup_scene:
 		var pickup = pickup_scene.instantiate()
 		pickup.weapon_type = weapon_type
 		pickup._weapon_data = weapon_data.duplicate()
-		pickup._is_dropped = true  # Marcar como droppeado (desaparecerÃ¡ si no se recoge)
-		get_tree().current_scene.add_child(pickup)
-		# Droppear detrás del jugador para evitar que la vuelva a coger al seguir corriendo hacia adelante
+		pickup._is_dropped = true
+		scene.add_child(pickup)
 		pickup.global_position = pos - last_look_dir * 1.5 + Vector3(0, 0.5, 0)
 
 @rpc("any_peer")
@@ -586,14 +608,14 @@ func rpc_spawn_styloo_projectile(pos: Vector3, dir: Vector3, weapon_type: String
 		if scene:
 			var proj = styloo_projectile_scene.instantiate()
 			scene.add_child(proj)
-			
-			# Seteamos la posiciÃ³n DESPUÃ‰S de aÃ±adir al Ã¡rbol para evitar el error de "is_inside_tree"
+
+			# Seteamos la posición DESPUÉS de añadir al árbol para evitar el error de "is_inside_tree"
 			proj.global_position = pos
 			proj.direction = dir.normalized()
 			proj.weapon_type = weapon_type
 			proj.damage = weapon_data.get("damage", 25)
-			
-			# Configurar comportamiento segÃºn tipo
+
+			# Configurar comportamiento según tipo
 			match weapon_type:
 				"shuriken1", "shuriken2", "shuriken3", "shuriken4":
 					proj.speed = 35.0
@@ -641,6 +663,10 @@ func _spawn_weapon_attack_effect(pos: Vector3, dir: Vector3, weapon_range: float
 	if not tree or not tree.current_scene:
 		return
 	
+	var scene: Node = tree.current_scene
+	if not scene:
+		return
+	
 	# Slash effect
 	var slash = CSGBox3D.new()
 	slash.size = Vector3(weapon_range * 0.8, 0.1, 0.8)
@@ -652,7 +678,7 @@ func _spawn_weapon_attack_effect(pos: Vector3, dir: Vector3, weapon_range: float
 	mat_slash.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	slash.material = mat_slash
 	
-	get_tree().current_scene.add_child(slash)
+	scene.add_child(slash)
 	slash.global_position = pos + Vector3(0, 1.0, 0) + dir * (weapon_range * 0.5)
 	slash.look_at(slash.global_position + dir, Vector3.UP)
 	

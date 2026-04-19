@@ -80,7 +80,6 @@ func _start_wave(wave_number: int) -> void:
 	current_wave = wave_number
 	_wave_in_progress = true
 	_enemies_spawned_this_wave = 0
-	_wave_start_time = Time.get_time_dict_from_system()["second"]
 	
 	var config = WAVE_CONFIG[wave_number]
 	_minions_to_spawn = config["minions"]

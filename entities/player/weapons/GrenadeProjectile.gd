@@ -110,14 +110,8 @@ func _explode() -> void:
 	
 	# Efecto visual de explosiÃ³n
 	_spawn_explosion_effect()
-	
-	# Ocultar mesh
-	var mesh = get_node_or_null("GrenadeMesh")
-	if mesh:
-		mesh.visible = false
-	
-	# Destruir despuÃ©s de efecto
-	await get_tree().create_timer(0.5).timeout
+
+	# Destruir inmediatamente
 	queue_free()
 
 func _spawn_explosion_effect() -> void:

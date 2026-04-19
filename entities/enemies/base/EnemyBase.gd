@@ -248,12 +248,14 @@ func _physics_process(delta: float) -> void:
 	_player_cache_timer += delta
 	if _player_cache_timer >= _player_cache_interval:
 		_player_cache_timer = 0.0
-		_player_cache = get_tree().get_nodes_in_group("player")
+		var all_players := get_tree().get_nodes_in_group("player")
+		_player_cache = all_players.filter(func(p): return is_instance_valid(p))
 	
 	# Usar cache de jugadores para encontrar referencia
 	if not _player_ref or not is_instance_valid(_player_ref):
-		if _player_cache.size() > 0:
-			_player_ref = _player_cache[0]
+		var valid_players := _player_cache.filter(func(p): return is_instance_valid(p))
+		if valid_players.size() > 0:
+			_player_ref = valid_players[0]
 	
 	var distance_to_player: float = INF
 	if _player_ref and is_instance_valid(_player_ref):
@@ -503,21 +505,34 @@ func take_damage(amount: int) -> void:
 
 func _hit_flash() -> void:
 	var visual := _visual_model
-	if visual:
-		# Buscar meshes dentro del VisualModel (GeometryInstance3D tienen modulate)
-		var meshes: Array[GeometryInstance3D] = []
-		for child in visual.get_children():
-			if child is GeometryInstance3D:
-				meshes.append(child)
-				# Buscar recursivamente
-				for grandchild in child.get_children():
-					if grandchild is GeometryInstance3D:
-						meshes.append(grandchild)
+	if not visual:
+		return
+	
+	var meshes: Array[GeometryInstance3D] = []
+	for child in visual.get_children():
+		if child is GeometryInstance3D:
+			meshes.append(child)
+			for grandchild in child.get_children():
+				if grandchild is GeometryInstance3D:
+					meshes.append(grandchild)
+	
+	if meshes.is_empty():
+		return
+	
+	for mesh in meshes:
+		var original_mat: Material = mesh.get_surface_override_material(0)
+		if not original_mat:
+			original_mat = mesh.material_override
 		
-		for mesh in meshes:
-			var tw = create_tween()
-			tw.tween_property(mesh, "modulate", Color(2.0, 0.5, 0.5, 1.0), 0.05)
-			tw.tween_property(mesh, "modulate", Color.WHITE, 0.15)
+		if not original_mat:
+			continue
+		
+		var hit_mat := original_mat.duplicate() as StandardMaterial3D
+		mesh.material_override = hit_mat
+		
+		var tw := create_tween()
+		tw.tween_property(hit_mat, "albedo_color", Color(2.0, 0.5, 0.5), 0.05)
+		tw.tween_property(hit_mat, "albedo_color", Color.WHITE, 0.15)
 
 func _hit_effect() -> void:
 	# PartÃ­culas de impacto

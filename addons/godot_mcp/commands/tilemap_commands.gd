@@ -1,104 +1,163 @@
 @tool
-extends "res://addons/godot_mcp/commands/base_commands.gd"
-## TileMap tile operations.
+extends "res://addons/godot_mcp/commands/base_command.gd"
 
 
-func get_handlers() -> Dictionary:
+func get_commands() -> Dictionary:
 	return {
-		"tilemap_set_cell": Callable(self, "_cmd_tilemap_set_cell"),
-		"tilemap_fill_rect": Callable(self, "_cmd_tilemap_fill_rect"),
-		"tilemap_get_cell": Callable(self, "_cmd_tilemap_get_cell"),
-		"tilemap_clear": Callable(self, "_cmd_tilemap_clear"),
-		"tilemap_get_info": Callable(self, "_cmd_tilemap_get_info"),
-		"tilemap_get_used_cells": Callable(self, "_cmd_tilemap_get_used_cells"),
+		"tilemap_set_cell": _tilemap_set_cell,
+		"tilemap_fill_rect": _tilemap_fill_rect,
+		"tilemap_get_cell": _tilemap_get_cell,
+		"tilemap_clear": _tilemap_clear,
+		"tilemap_get_info": _tilemap_get_info,
+		"tilemap_get_used_cells": _tilemap_get_used_cells,
 	}
 
 
-func _get_tilemap(p: Dictionary) -> TileMapLayer:
-	var path := String(p.get("path", p.get("tilemapPath", "")))
-	if path.is_empty():
-		return null
-	var node := _find_node(path)
+func _find_tilemap(node_path: String) -> TileMapLayer:
+	var node := find_node_by_path(node_path)
 	if node is TileMapLayer:
 		return node as TileMapLayer
 	return null
 
 
-func _cmd_tilemap_set_cell(p: Dictionary) -> Dictionary:
-	var tm := _get_tilemap(p)
-	if tm == null:
-		return _error(-32602, "TileMapLayer not found", "Pass valid path to TileMapLayer node")
-	var x := int(p.get("x", 0))
-	var y := int(p.get("y", 0))
-	var source_id := int(p.get("sourceId", 0))
-	var atlas_x := int(p.get("atlasX", 0))
-	var atlas_y := int(p.get("atlasY", 0))
-	var alt := int(p.get("alternativeTile", 0))
-	tm.set_cell(Vector2i(x, y), source_id, Vector2i(atlas_x, atlas_y), alt)
-	return {"x": x, "y": y, "ok": true}
+func _tilemap_set_cell(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var tilemap := _find_tilemap(node_path)
+	if tilemap == null:
+		return error_not_found("TileMapLayer at '%s'" % node_path)
+
+	var x: int = int(params.get("x", 0))
+	var y: int = int(params.get("y", 0))
+	var source_id: int = int(params.get("source_id", 0))
+	var atlas_x: int = int(params.get("atlas_x", 0))
+	var atlas_y: int = int(params.get("atlas_y", 0))
+	var alternative: int = int(params.get("alternative", 0))
+
+	tilemap.set_cell(Vector2i(x, y), source_id, Vector2i(atlas_x, atlas_y), alternative)
+
+	return success({"x": x, "y": y, "source_id": source_id, "atlas_coords": [atlas_x, atlas_y]})
 
 
-func _cmd_tilemap_fill_rect(p: Dictionary) -> Dictionary:
-	var tm := _get_tilemap(p)
-	if tm == null:
-		return _error(-32602, "TileMapLayer not found", "Pass valid path")
-	var x1 := int(p.get("x1", 0))
-	var y1 := int(p.get("y1", 0))
-	var x2 := int(p.get("x2", 0))
-	var y2 := int(p.get("y2", 0))
-	var source_id := int(p.get("sourceId", 0))
-	var atlas_x := int(p.get("atlasX", 0))
-	var atlas_y := int(p.get("atlasY", 0))
+func _tilemap_fill_rect(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var tilemap := _find_tilemap(node_path)
+	if tilemap == null:
+		return error_not_found("TileMapLayer at '%s'" % node_path)
+
+	var x1: int = int(params.get("x1", 0))
+	var y1: int = int(params.get("y1", 0))
+	var x2: int = int(params.get("x2", 0))
+	var y2: int = int(params.get("y2", 0))
+	var source_id: int = int(params.get("source_id", 0))
+	var atlas_x: int = int(params.get("atlas_x", 0))
+	var atlas_y: int = int(params.get("atlas_y", 0))
+	var alternative: int = int(params.get("alternative", 0))
+
 	var count := 0
-	for x in range(min(x1, x2), max(x1, x2) + 1):
-		for y in range(min(y1, y2), max(y1, y2) + 1):
-			tm.set_cell(Vector2i(x, y), source_id, Vector2i(atlas_x, atlas_y))
+	for cx in range(mini(x1, x2), maxi(x1, x2) + 1):
+		for cy in range(mini(y1, y2), maxi(y1, y2) + 1):
+			tilemap.set_cell(Vector2i(cx, cy), source_id, Vector2i(atlas_x, atlas_y), alternative)
 			count += 1
-	return {"filled": count, "ok": true}
+
+	return success({"filled": count, "rect": [x1, y1, x2, y2]})
 
 
-func _cmd_tilemap_get_cell(p: Dictionary) -> Dictionary:
-	var tm := _get_tilemap(p)
-	if tm == null:
-		return _error(-32602, "TileMapLayer not found", "Pass valid path")
-	var x := int(p.get("x", 0))
-	var y := int(p.get("y", 0))
+func _tilemap_get_cell(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var tilemap := _find_tilemap(node_path)
+	if tilemap == null:
+		return error_not_found("TileMapLayer at '%s'" % node_path)
+
+	var x: int = int(params.get("x", 0))
+	var y: int = int(params.get("y", 0))
 	var coords := Vector2i(x, y)
-	var source_id := tm.get_cell_source_id(coords)
-	var atlas_coords := tm.get_cell_atlas_coords(coords)
-	var alt := tm.get_cell_alternative_tile(coords)
-	return {"x": x, "y": y, "sourceId": source_id, "atlasCoords": [atlas_coords.x, atlas_coords.y], "alternativeTile": alt}
+
+	var source_id := tilemap.get_cell_source_id(coords)
+	var atlas_coords := tilemap.get_cell_atlas_coords(coords)
+	var alternative := tilemap.get_cell_alternative_tile(coords)
+
+	return success({
+		"x": x, "y": y,
+		"source_id": source_id,
+		"atlas_coords": [atlas_coords.x, atlas_coords.y],
+		"alternative": alternative,
+		"empty": source_id == -1,
+	})
 
 
-func _cmd_tilemap_clear(p: Dictionary) -> Dictionary:
-	var tm := _get_tilemap(p)
-	if tm == null:
-		return _error(-32602, "TileMapLayer not found", "Pass valid path")
-	tm.clear()
-	return {"ok": true}
+func _tilemap_clear(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var tilemap := _find_tilemap(node_path)
+	if tilemap == null:
+		return error_not_found("TileMapLayer at '%s'" % node_path)
+
+	tilemap.clear()
+	return success({"cleared": true})
 
 
-func _cmd_tilemap_get_info(p: Dictionary) -> Dictionary:
-	var tm := _get_tilemap(p)
-	if tm == null:
-		return _error(-32602, "TileMapLayer not found", "Pass valid path")
-	var tile_set := tm.tile_set
-	var info := {"path": String(tm.get_path()), "has_tileset": tile_set != null}
+func _tilemap_get_info(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var tilemap := _find_tilemap(node_path)
+	if tilemap == null:
+		return error_not_found("TileMapLayer at '%s'" % node_path)
+
+	var tile_set := tilemap.tile_set
+	var sources: Array = []
 	if tile_set:
-		info["tile_size"] = [tile_set.tile_size.x, tile_set.tile_size.y]
-		info["sources_count"] = tile_set.get_source_count()
-	info["used_cells"] = tm.get_used_cells().size()
-	return info
+		for i in tile_set.get_source_count():
+			var source_id := tile_set.get_source_id(i)
+			var source := tile_set.get_source(source_id)
+			var info := {"id": source_id, "type": source.get_class()}
+			if source is TileSetAtlasSource:
+				var atlas: TileSetAtlasSource = source
+				info["texture"] = atlas.texture.resource_path if atlas.texture else ""
+				info["tile_count"] = atlas.get_tiles_count()
+			sources.append(info)
+
+	return success({
+		"node_path": node_path,
+		"used_cells": tilemap.get_used_cells().size(),
+		"tile_set_sources": sources,
+		"tile_size": [tile_set.tile_size.x, tile_set.tile_size.y] if tile_set else [0, 0],
+	})
 
 
-func _cmd_tilemap_get_used_cells(p: Dictionary) -> Dictionary:
-	var tm := _get_tilemap(p)
-	if tm == null:
-		return _error(-32602, "TileMapLayer not found", "Pass valid path")
-	var cells := tm.get_used_cells()
-	var result: Array[Dictionary] = []
-	var max_cells := int(p.get("maxCells", 500))
-	for i in range(min(cells.size(), max_cells)):
-		var c: Vector2i = cells[i]
-		result.append({"x": c.x, "y": c.y, "sourceId": tm.get_cell_source_id(c)})
-	return {"count": cells.size(), "cells": result, "truncated": cells.size() > max_cells}
+func _tilemap_get_used_cells(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var tilemap := _find_tilemap(node_path)
+	if tilemap == null:
+		return error_not_found("TileMapLayer at '%s'" % node_path)
+
+	var max_count: int = optional_int(params, "max_count", 500)
+	var cells: Array = []
+	var used := tilemap.get_used_cells()
+
+	for i in mini(used.size(), max_count):
+		var pos: Vector2i = used[i]
+		cells.append({"x": pos.x, "y": pos.y, "source_id": tilemap.get_cell_source_id(pos)})
+
+	return success({"cells": cells, "total": used.size(), "returned": cells.size()})

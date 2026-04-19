@@ -12,6 +12,18 @@ extends CharacterBody3D
 @export var fire_rate: float = 0.28  # +25% mÃ¡s rÃ¡pido
 @export var gravity: float = 20.0
 
+# Combat modes
+enum CombatMode { RANGED, MELEE, FIREBALL }
+var _current_combat_mode: CombatMode = CombatMode.RANGED
+var _attack_cooldown: float = 0.0
+var _melee_cooldown: float = 0.0
+var _fireball_cooldown: float = 0.0
+var _mode_switch_timer: float = 0.0
+
+# Weapon pickup
+var _nearby_weapon: Node3D = null
+@onready var fireball_scene := preload("res://entities/player/weapons/MagicProjectile.tscn")
+
 # IA mejorada
 @export_category("Bot AI")
 @export var kite_speed: float = 2.86  # +30%
@@ -36,6 +48,7 @@ var _bot_state: BotState = BotState.IDLE
 var _dodge_direction: Vector3 = Vector3.ZERO
 var _dodge_timer: float = 0.0
 var _support_target: Node3D = null
+var _last_melee_target: Node3D = null
 
 signal bot_died
 
@@ -54,6 +67,12 @@ func _ready() -> void:
 	current_health = max_health
 	
 	visual_model = get_node_or_null("VisualModel")
+	
+	# Initialize cooldowns
+	_attack_cooldown = 0.0
+	_melee_cooldown = 0.0
+	_fireball_cooldown = 0.0
+	_mode_switch_timer = 2.0  # Switch combat mode every 2 seconds
 	
 	# Find weapon (legacy)
 	for child in get_children():
@@ -134,6 +153,14 @@ func _physics_process(delta: float) -> void:
 func _update_fire_timer(delta: float) -> void:
 	if _fire_timer > 0.0:
 		_fire_timer -= delta
+	if _attack_cooldown > 0.0:
+		_attack_cooldown -= delta
+	if _melee_cooldown > 0.0:
+		_melee_cooldown -= delta
+	if _fireball_cooldown > 0.0:
+		_fireball_cooldown -= delta
+	if _mode_switch_timer > 0.0:
+		_mode_switch_timer -= delta
 
 func _update_targets() -> void:
 	# Find enemies with priority (Mage > Rogue > Base > Minion)
@@ -172,7 +199,7 @@ func _update_targets() -> void:
 	
 	_target_enemy = best_target
 	
-	# Find human player to follow
+	# Find human player to follow - prioritize staying close to ANY player
 	var humans := get_tree().get_nodes_in_group("player")
 	var nearest_human_dist: float = INF
 	_follow_target = null
@@ -183,6 +210,16 @@ func _update_targets() -> void:
 		if d < nearest_human_dist:
 			nearest_human_dist = d
 			_follow_target = h as Node3D
+	
+	# If no human found, stay close to any nearby bot
+	if _follow_target == null:
+		var bots := get_tree().get_nodes_in_group("bots")
+		for b in bots:
+			if b == self or not (b is Node3D): continue
+			var d: float = global_position.distance_to((b as Node3D).global_position)
+			if d < 8.0 and d < nearest_human_dist:
+				nearest_human_dist = d
+				_follow_target = b as Node3D
 	
 	# Buscar aliado que necesite ayuda
 	if support_ally:
@@ -201,6 +238,9 @@ func _update_targets() -> void:
 			if hp_pct < lowest_health_pct and global_position.distance_to(bot.global_position) < 15.0:
 				lowest_health_pct = hp_pct
 				_support_target = bot
+	
+	# Check for nearby weapons to pick up
+	_nearby_weapon = _find_nearest_weapon()
 
 func _is_targeting_ally(enemy: Node3D) -> bool:
 	# Verificar si el enemigo estÃ¡ atacando a un aliado
@@ -210,9 +250,27 @@ func _is_targeting_ally(enemy: Node3D) -> bool:
 			return true
 	return false
 
+func _find_nearest_weapon() -> Node3D:
+	# Find weapon pickups in the world
+	var weapon_pickups = get_tree().get_nodes_in_group("weapon_pickup")
+	var nearest: Node3D = null
+	var nearest_dist: float = INF
+	for wp in weapon_pickups:
+		if wp is Node3D:
+			var d = global_position.distance_to(wp.global_position)
+			if d < 5.0 and d < nearest_dist:  # Only pick up if close
+				nearest_dist = d
+				nearest = wp as Node3D
+	return nearest
+
 func _evaluate_bot_state() -> void:
 	# Evaluar estado del bot
 	var health_pct = float(current_health) / max_health
+	
+	# Pick up weapon if nearby
+	if _nearby_weapon:
+		_bot_state = BotState.FOLLOW  # Will move toward weapon
+		return
 	
 	# Retirarse si vida baja
 	if health_pct < retreat_health_pct:
@@ -231,11 +289,20 @@ func _evaluate_bot_state() -> void:
 			_bot_state = BotState.SUPPORT
 			return
 	
+	# Update combat mode based on distance
+	_update_combat_mode()
+	
 	# Kiting: mantener distancia Ã³ptima
 	if _target_enemy:
 		var dist_to_enemy = global_position.distance_to(_target_enemy.global_position)
-		if dist_to_enemy < optimal_distance * 0.6:
-			# Muy cerca - hacer kiting hacia atrÃ¡s
+		if _current_combat_mode == CombatMode.MELEE:
+			# For melee, get close
+			if dist_to_enemy > 3.0:
+				_bot_state = BotState.CHASE
+			else:
+				_bot_state = BotState.CHASE  # Stay close for melee
+		elif dist_to_enemy < optimal_distance * 0.5 and _current_combat_mode == CombatMode.RANGED:
+			# Muy cerca for ranged - kite back
 			_bot_state = BotState.KITE
 			return
 		elif dist_to_enemy > attack_range * 1.2:
@@ -248,6 +315,29 @@ func _evaluate_bot_state() -> void:
 	else:
 		_bot_state = BotState.FOLLOW
 
+func _update_combat_mode() -> void:
+	# Switch combat mode periodically
+	if _mode_switch_timer <= 0.0 and _target_enemy:
+		_mode_switch_timer = 2.0 + randf() * 2.0  # 2-4 seconds
+		var dist = global_position.distance_to(_target_enemy.global_position)
+		
+		# Choose mode based on distance
+		if dist < 4.0:
+			# Close range - prefer melee
+			_current_combat_mode = CombatMode.MELEE if randf() > 0.3 else CombatMode.FIREBALL
+		elif dist < 10.0:
+			# Medium range - mix of all
+			var r = randf()
+			if r < 0.4:
+				_current_combat_mode = CombatMode.RANGED
+			elif r < 0.7:
+				_current_combat_mode = CombatMode.FIREBALL
+			else:
+				_current_combat_mode = CombatMode.MELEE
+		else:
+			# Long range - prefer ranged and fireball
+			_current_combat_mode = CombatMode.RANGED if randf() > 0.4 else CombatMode.FIREBALL
+
 func _move(delta: float) -> void:
 	_evaluate_bot_state()
 	
@@ -257,6 +347,18 @@ func _move(delta: float) -> void:
 	# Actualizar timers de dodge
 	if _dodge_timer > 0:
 		_dodge_timer -= delta
+	
+	# Handle weapon pickup
+	if _nearby_weapon and _bot_state == BotState.FOLLOW:
+		var dist_to_weapon = global_position.distance_to(_nearby_weapon.global_position)
+		if dist_to_weapon < 1.5:
+			# Pick up the weapon
+			if _nearby_weapon.has_method("pickup"):
+				_nearby_weapon.pickup(self)
+			_nearby_weapon = null
+		else:
+			move_to_node = _nearby_weapon
+			actual_speed = kite_speed
 	
 	match _bot_state:
 		BotState.KITE:
@@ -286,16 +388,40 @@ func _move(delta: float) -> void:
 				actual_speed = kite_speed
 			
 		BotState.CHASE:
-			# Perseguir enemigo
-			if _target_enemy and global_position.distance_to(_target_enemy.global_position) > optimal_distance * 0.8:
-				move_to_node = _target_enemy
+			# Perseguir enemigo - adjust distance based on combat mode
+			if _target_enemy:
+				var dist_to_enemy = global_position.distance_to(_target_enemy.global_position)
+				var target_dist = optimal_distance
+				if _current_combat_mode == CombatMode.MELEE:
+					target_dist = 2.5  # Get very close for melee
+				elif _current_combat_mode == CombatMode.FIREBALL:
+					target_dist = 8.0
+				
+				if dist_to_enemy > target_dist:
+					move_to_node = _target_enemy
+				elif dist_to_enemy < target_dist * 0.7 and _current_combat_mode != CombatMode.MELEE:
+					# Too close for ranged, back up
+					var to_enemy = _target_enemy.global_position - global_position
+					var retreat_dir = -Vector3(to_enemy.x, 0, to_enemy.z).normalized()
+					velocity.x = retreat_dir.x * kite_speed * 0.5
+					velocity.z = retreat_dir.z * kite_speed * 0.5
+					return
 			
 		BotState.FOLLOW:
-			# Seguir al jugador
+			# Follow player - stay close
 			if _follow_target:
 				var dist_to_player = global_position.distance_to(_follow_target.global_position)
-				if dist_to_player > 3.0:
+				if dist_to_player > 4.0:  # Stay within 4 units
 					move_to_node = _follow_target
+			elif _target_enemy == null:
+				# No target, patrol near player
+				if _follow_target:
+					var patrol_offset = Vector3(randf() - 0.5, 0, randf() - 0.5) * 3.0
+					var patrol_target = _follow_target.global_position + patrol_offset
+					var to_patrol = (patrol_target - global_position).normalized()
+					velocity.x = to_patrol.x * move_speed * 0.3
+					velocity.z = to_patrol.z * move_speed * 0.3
+					return
 	
 	# Aplicar movimiento
 	if move_to_node:
@@ -345,9 +471,24 @@ func _try_dodge(delta: float) -> void:
 		velocity.z += _dodge_direction.z * 18.0 * delta
 
 func _try_shoot() -> void:
+	if not _target_enemy:
+		return
+	
+	var dist: float = global_position.distance_to(_target_enemy.global_position)
+	
+	# Execute attack based on combat mode
+	match _current_combat_mode:
+		CombatMode.MELEE:
+			_try_melee_attack()
+		CombatMode.FIREBALL:
+			_try_fireball_attack()
+		CombatMode.RANGED:
+			_try_ranged_attack()
+
+func _try_ranged_attack() -> void:
 	if _fire_timer > 0.0 or not _target_enemy:
 		return
-		
+	
 	var dist: float = global_position.distance_to(_target_enemy.global_position)
 	if dist > attack_range:
 		return
@@ -366,6 +507,97 @@ func _try_shoot() -> void:
 	var am = get_node_or_null("/root/AudioManager")
 	if am and am.has_method("play_shoot"):
 		am.play_shoot()
+
+func _try_melee_attack() -> void:
+	if _melee_cooldown > 0.0 or not _target_enemy:
+		return
+	
+	var dist: float = global_position.distance_to(_target_enemy.global_position)
+	if dist > 3.5:  # Melee range
+		return
+	
+	_melee_cooldown = 0.8  # Melee cooldown
+	
+	# Create melee slash effect
+	if multiplayer.is_server():
+		var slash_pos = (global_position + _target_enemy.global_position) / 2.0
+		slash_pos.y = global_position.y + 1.0
+		_rpc_spawn_melee_slash.rpc(slash_pos, _target_enemy.global_position - global_position)
+	
+	# Deal damage directly
+	var enemy = _target_enemy
+	if enemy.has_method("take_damage"):
+		enemy.take_damage(50)  # High melee damage
+	elif enemy.has_method("damage"):
+		enemy.damage(50)
+	_last_melee_target = enemy
+
+@rpc("authority", "call_local")
+func _rpc_spawn_melee_slash(pos: Vector3, dir: Vector3) -> void:
+	# Create visual slash effect
+	var slash = MeshInstance3D.new()
+	var plane = PlaneMesh.new()
+	plane.size = Vector2(2.0, 2.0)
+	slash.mesh = plane
+	
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.3, 0.3, 0.8)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.2, 0.2)
+	mat.emission_energy_multiplier = 2.0
+	slash.material_override = mat
+	
+	get_tree().current_scene.add_child(slash)
+	slash.global_position = pos
+	
+	# Face the direction
+	if dir.length() > 0.1:
+		slash.look_at(slash.global_position + dir.normalized(), Vector3.UP)
+	
+	# Animate and remove
+	var tween = create_tween()
+	var start_scale = slash.scale
+	slash.scale = Vector3.ZERO
+	var mat_color: Color = mat.albedo_color
+	tween.tween_property(slash, "scale", Vector3(1.5, 1.5, 1.5), 0.15)
+	tween.tween_method(func(a): mat.albedo_color = Color(mat_color.r, mat_color.g, mat_color.b, a), mat_color.a, 0.0, 0.1)
+	tween.tween_callback(slash.queue_free)
+
+func _try_fireball_attack() -> void:
+	if _fireball_cooldown > 0.0 or not _target_enemy:
+		return
+	
+	var dist: float = global_position.distance_to(_target_enemy.global_position)
+	if dist > 20.0:  # Fireball range
+		return
+	
+	_fireball_cooldown = 2.0  # Fireball cooldown
+	
+	var shoot_dir := ((_target_enemy.global_position + Vector3(0, 0.5, 0)) - (global_position + Vector3(0, 1.0, 0))).normalized()
+	var muzzle_pos := global_position + shoot_dir * 1.5 + Vector3(0, 1.0, 0)
+	
+	if multiplayer.is_server():
+		rpc_spawn_fireball.rpc(muzzle_pos, shoot_dir)
+	else:
+		rpc_id(1, "rpc_request_fireball", muzzle_pos, shoot_dir)
+
+@rpc("any_peer")
+func rpc_request_fireball(pos: Vector3, dir: Vector3) -> void:
+	if multiplayer.is_server():
+		rpc_spawn_fireball.rpc(pos, dir)
+
+@rpc("authority", "call_local")
+func rpc_spawn_fireball(pos: Vector3, dir: Vector3) -> void:
+	if fireball_scene:
+		var scene = get_tree().current_scene
+		if scene:
+			var proj = fireball_scene.instantiate()
+			scene.add_child(proj)
+			proj.global_position = pos
+			proj.direction = dir
+			proj.speed = 15.0
+			proj.impact_damage = 40
 
 @rpc("any_peer")
 func rpc_request_bot_projectile(pos: Vector3, dir: Vector3) -> void:
@@ -387,8 +619,9 @@ func rpc_spawn_bot_projectile(pos: Vector3, dir: Vector3) -> void:
 			proj.life_time = 2.0
 
 # INTELIGENCIA AUTÃ“NOMA: Los bots recogen botÃ­n para hacerse mÃ¡s fuertes
-func pickup_styloo_weapon(weapon_name: String, data: Dictionary) -> void:
-	# El bot se hace mÃ¡s poderoso en lugar de cambiar de modelo complejo
+@warning_ignore("unused_parameter")
+func pickup_styloo_weapon(_weapon_name: String, _data: Dictionary) -> void:
+	# El bot se hace más poderoso en lugar de cambiar de modelo complejo
 	max_health += 50
 	current_health = max_health
 	fire_rate = max(0.1, fire_rate - 0.05)

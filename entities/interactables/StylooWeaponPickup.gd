@@ -9,21 +9,21 @@ const WEAPON_PACK_PATH := "res://assets/models/weapons/weaponsassetspackbyStyloo
 const STYLOO_WEAPONS := {
 	"bayonet": {
 		"file": "ASSETS.fbx_bayonet.fbx",
-		"scale": Vector3(0.015, 0.015, 0.015),
+		"scale": Vector3(0.03, 0.03, 0.03),
 		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.3, "damage": 35, "range": 3.0,
 		"color": Color(0.7, 0.7, 0.8, 1.0)
 	},
 	"coolknife": {
 		"file": "ASSETS.fbx_coolknife.fbx",
-		"scale": Vector3(0.015, 0.015, 0.015),
+		"scale": Vector3(0.03, 0.03, 0.03),
 		"rotation": Vector3(0, 90, 0),
 		"cooldown": 0.25, "damage": 30, "range": 2.5,
 		"color": Color(0.2, 0.8, 1.0, 1.0)
 	},
 	"doubleAxe": {
 		"file": "ASSETS.fbx_doubleAxe.fbx",
-		"scale": Vector3(0.012, 0.012, 0.012),
+		"scale": Vector3(0.024, 0.024, 0.024),
 		"rotation": Vector3(0, 0, 0),
 		"cooldown": 1.0, "damage": 90, "range": 5.0,
 		"color": Color(0.8, 0.2, 0.2, 1.0),
@@ -38,7 +38,7 @@ const STYLOO_WEAPONS := {
 	},
 	"kunai": {
 		"file": "ASSETS.fbx_kunai.fbx",
-		"scale": Vector3(0.02, 0.02, 0.02),
+		"scale": Vector3(0.04, 0.04, 0.04),
 		"rotation": Vector3(0, 45, 45),
 		"cooldown": 0.2, "damage": 28, "range": 2.0,
 		"color": Color(0.5, 0.0, 0.8, 1.0),
@@ -60,14 +60,14 @@ const STYLOO_WEAPONS := {
 	},
 	"pickaxe": {
 		"file": "ASSETS.fbx_pickaxe.fbx",
-		"scale": Vector3(0.012, 0.012, 0.012),
+		"scale": Vector3(0.024, 0.024, 0.024),
 		"rotation": Vector3(0, 0, 0),
 		"cooldown": 0.5, "damage": 55, "range": 3.5,
 		"color": Color(0.4, 0.3, 0.2, 1.0)
 	},
 	"shuriken1": {
 		"file": "ASSETS.fbx_shuriken1.fbx",
-		"scale": Vector3(0.02, 0.02, 0.02),
+		"scale": Vector3(0.04, 0.04, 0.04),
 		"rotation": Vector3(90, 0, 0),
 		"cooldown": 0.15, "damage": 22, "range": 2.0,
 		"color": Color(1.0, 0.5, 0.0, 1.0),
@@ -75,7 +75,7 @@ const STYLOO_WEAPONS := {
 	},
 	"shuriken2": {
 		"file": "ASSETS.fbx_shuriken2.fbx",
-		"scale": Vector3(0.02, 0.02, 0.02),
+		"scale": Vector3(0.04, 0.04, 0.04),
 		"rotation": Vector3(90, 0, 0),
 		"cooldown": 0.15, "damage": 22, "range": 2.0,
 		"color": Color(0.0, 1.0, 0.5, 1.0),
@@ -83,7 +83,7 @@ const STYLOO_WEAPONS := {
 	},
 	"shuriken3": {
 		"file": "ASSETS.fbx_shuriken3.fbx",
-		"scale": Vector3(0.02, 0.02, 0.02),
+		"scale": Vector3(0.04, 0.04, 0.04),
 		"rotation": Vector3(90, 0, 0),
 		"cooldown": 0.15, "damage": 18, "range": 2.0,
 		"color": Color(1.0, 0.0, 1.0, 1.0),
@@ -91,7 +91,7 @@ const STYLOO_WEAPONS := {
 	},
 	"shuriken4": {
 		"file": "ASSETS.fbx_shuriken4.fbx",
-		"scale": Vector3(0.02, 0.02, 0.02),
+		"scale": Vector3(0.04, 0.04, 0.04),
 		"rotation": Vector3(90, 0, 0),
 		"cooldown": 0.15, "damage": 25, "range": 2.0,
 		"color": Color(1.0, 0.8, 0.0, 1.0),
@@ -99,7 +99,7 @@ const STYLOO_WEAPONS := {
 	},
 	"simpleAxe": {
 		"file": "ASSETS.fbx_simpleAxe.fbx",
-		"scale": Vector3(0.015, 0.015, 0.015),
+		"scale": Vector3(0.03, 0.03, 0.03),
 		"rotation": Vector3(0, 0, 0),
 		"cooldown": 0.8, "damage": 70, "range": 4.0,
 		"color": Color(0.5, 0.5, 0.4, 1.0),
@@ -133,18 +133,39 @@ func _ready() -> void:
 
 	add_to_group("styloo_pickups")
 
-	# Configurar collision — capa 1 para detectar jugadores en esa capa
-	collision_layer = 1
-	collision_mask = 1
+	# Configurar collision — capa 2 para pickupeables, detecta capa 1 (jugadores)
+	collision_layer = 2  # Capa de pickupeables
+	collision_mask = 1   # Detecta jugadores (capa 1 por defecto)
 	monitoring = true
-	monitorable = true
+	call_deferred("set", "monitorable", true)  # Usar call_deferred como indica el error
 
-	# Añadir collision shape
+	# Añadir collision shape - MISMA ALTURA QUE EL ARMA VISUAL
 	var col := CollisionShape3D.new()
+	col.name = "PickupCollision"
 	var sphere := SphereShape3D.new()
-	sphere.radius = 1.5
+	sphere.radius = 2.5
 	col.shape = sphere
+	col.position = Vector3(0, 0.3, 0)  # Misma altura que WeaponVisual
 	add_child(col)
+	
+	# Debug visual - esfera en MISMA POSICIÓN que el arma
+	var debug_mesh := MeshInstance3D.new()
+	debug_mesh.name = "DebugCollisionArea"
+	var sphere_mesh := SphereMesh.new()
+	sphere_mesh.radius = 2.5
+	sphere_mesh.height = 5.0
+	sphere_mesh.radial_segments = 16
+	sphere_mesh.rings = 8
+	debug_mesh.mesh = sphere_mesh
+	debug_mesh.position = Vector3(0, 0.3, 0)  # Misma altura que el arma
+	var debug_mat := StandardMaterial3D.new()
+	debug_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	debug_mat.albedo_color = Color(0, 1, 0, 0.3)  # Verde semi-transparente
+	debug_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	debug_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	debug_mat.no_depth_test = true  # Siempre visible
+	debug_mesh.material_override = debug_mat
+	add_child(debug_mesh)
 
 	# Conectar señal de pickup
 	body_entered.connect(_on_body_entered)
@@ -153,8 +174,8 @@ func _ready() -> void:
 	# para que el nodo esté completamente en el árbol antes
 	call_deferred("_build_visual")
 
-	# Timer de despawn si fue dropeada
-	if _is_dropped and multiplayer.is_server():
+	# Timer de despawn - siempre en servidor
+	if multiplayer.is_server():
 		var t := get_tree().create_timer(DESPAWN_TIME)
 		t.timeout.connect(_fade_and_die)
 
@@ -164,7 +185,7 @@ func _build_visual() -> void:
 	# El nodo raíz (Area3D) NUNCA se mueve — su posición es la del pickup.
 	var visual := Node3D.new()
 	visual.name = "WeaponVisual"
-	visual.position = Vector3(0.0, 0.8, 0.0)  # elevado sobre el suelo
+	visual.position = Vector3(0.0, 0.3, 0.0)  # elevado sobre el suelo
 	add_child(visual)
 
 	# ─── MODELO 3D ────────────────────────────────────────────────────
@@ -191,8 +212,10 @@ func _build_visual() -> void:
 	# ─── LUZ ──────────────────────────────────────────────────────────
 	var light := OmniLight3D.new()
 	light.light_color = _weapon_data.get("color", Color.WHITE) as Color
-	light.light_energy = 4.0
-	light.omni_range = 5.0
+	light.light_energy = 2.0  # Reducido para no tapar el arma
+	light.omni_range = 3.0
+	light.omni_attenuation = 1.0
+	light.position = Vector3(0, 0.5, 0)  # Encima del arma
 	light.shadow_enabled = false
 	add_child(light)
 
@@ -207,10 +230,16 @@ func _apply_texture(model: Node3D) -> void:
 	if not tex:
 		return
 	for mesh in _find_meshes(model):
+		# Limpiar materiales embebidos primero
+		mesh.material_override = null
+		mesh.material_overlay = null
+		# Crear material fresco con textura
 		var mat := StandardMaterial3D.new()
 		mat.albedo_texture = tex
+		mat.albedo_color = Color.WHITE
 		mat.metallic = 0.3
 		mat.roughness = 0.5
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 		mesh.material_override = mat
 
 func _find_meshes(node: Node) -> Array[MeshInstance3D]:
@@ -241,13 +270,32 @@ func _process(delta: float) -> void:
 		_despawn_timer += delta
 
 func _on_body_entered(body: Node3D) -> void:
-	if not multiplayer.is_server():
+	print("StylooPickup: Body entered - ", body.name, " groups: ", body.get_groups())
+	
+	# Permitir pickup en servidor O en modo offline single-player
+	var is_authority = multiplayer.is_server() or not multiplayer.has_multiplayer_peer() or multiplayer.multiplayer_peer is OfflineMultiplayerPeer
+	if not is_authority:
+		print("StylooPickup: Not authority, ignoring")
 		return
+	
 	if _is_dropped and _despawn_timer < 0.5:
+		print("StylooPickup: Dropped recently, ignoring")
 		return
-	if body.is_in_group("player") and body.has_method("pickup_styloo_weapon"):
-		body.pickup_styloo_weapon(weapon_type, _weapon_data)
-		rpc_destroy.rpc()
+	
+	if body.is_in_group("player"):
+		print("StylooPickup: Body is player, has method: ", body.has_method("pickup_styloo_weapon"))
+		if body.has_method("pickup_styloo_weapon"):
+			print("StylooPickup: Calling pickup_styloo_weapon with ", weapon_type)
+			body.pickup_styloo_weapon(weapon_type, _weapon_data)
+			# Destruir localmente en modo offline, RPC en modo online
+			if multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
+				rpc_destroy.rpc()
+			else:
+				queue_free()
+		else:
+			print("StylooPickup: Player missing pickup_styloo_weapon method!")
+	else:
+		print("StylooPickup: Body not in 'player' group")
 
 @rpc("authority", "call_local")
 func rpc_destroy() -> void:

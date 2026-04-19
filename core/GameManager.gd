@@ -49,6 +49,7 @@ func restart_game() -> void:
 	get_tree().paused = false
 	is_game_over = false
 	current_score = 0
+	player = null
 	if solo_mode:
 		# Restart in solo mode: go back to menu (cleaner than reloading in-place)
 		get_tree().change_scene_to_file("res://ui/menu/MainMenu.tscn")

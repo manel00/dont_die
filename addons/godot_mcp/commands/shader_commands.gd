@@ -1,135 +1,226 @@
 @tool
-extends "res://addons/godot_mcp/commands/base_commands.gd"
-## Shader commands: create, assign, set/get params.
+extends "res://addons/godot_mcp/commands/base_command.gd"
 
 
-func get_handlers() -> Dictionary:
+func get_commands() -> Dictionary:
 	return {
-		"create_shader": Callable(self, "_cmd_create_shader"),
-		"assign_shader_material": Callable(self, "_cmd_assign_shader_material"),
-		"set_shader_param": Callable(self, "_cmd_set_shader_param"),
-		"get_shader_params": Callable(self, "_cmd_get_shader_params"),
+		"create_shader": _create_shader,
+		"read_shader": _read_shader,
+		"edit_shader": _edit_shader,
+		"assign_shader_material": _assign_shader_material,
+		"set_shader_param": _set_shader_param,
+		"get_shader_params": _get_shader_params,
 	}
 
 
-func _cmd_create_shader(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass payload.path like res://shaders/effect.gdshader")
-	var template := String(p.get("template", "canvas_item")).to_lower()
-	var code := String(p.get("code", ""))
-	if code.is_empty():
-		match template:
-			"canvas_item":
-				code = """shader_type canvas_item;
+func _create_shader(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
 
-uniform vec4 modulate_color : source_color = vec4(1.0);
-uniform float alpha : hint_range(0.0, 1.0) = 1.0;
+	var content: String = optional_string(params, "content", "")
+	var shader_type: String = optional_string(params, "shader_type", "spatial")
 
-void fragment() {
-	COLOR = texture(TEXTURE, UV) * modulate_color;
-	COLOR.a *= alpha;
-}
-"""
+	if content.is_empty():
+		match shader_type:
 			"spatial":
-				code = """shader_type spatial;
-
-uniform vec4 albedo_color : source_color = vec4(1.0);
-uniform float metallic : hint_range(0.0, 1.0) = 0.0;
-uniform float roughness : hint_range(0.0, 1.0) = 0.5;
-
-void fragment() {
-	ALBEDO = albedo_color.rgb;
-	METALLIC = metallic;
-	ROUGHNESS = roughness;
-}
-"""
+				content = "shader_type spatial;\n\nvoid vertex() {\n\t// Called for every vertex\n}\n\nvoid fragment() {\n\t// Called for every pixel\n\tALBEDO = vec3(1.0);\n}\n"
+			"canvas_item":
+				content = "shader_type canvas_item;\n\nvoid vertex() {\n\t// Called for every vertex\n}\n\nvoid fragment() {\n\t// Called for every pixel\n\tCOLOR = vec4(1.0);\n}\n"
 			"particles":
-				code = """shader_type particles;
-
-uniform float speed = 1.0;
-uniform float spread = 0.5;
-
-void start() {
-	VELOCITY = vec3(sin(float(INDEX) * spread), 1.0, cos(float(INDEX) * spread)) * speed;
-}
-
-void process() {
-	VELOCITY.y -= 9.8 * DELTA;
-}
-"""
+				content = "shader_type particles;\n\nvoid start() {\n\t// Called when particle spawns\n}\n\nvoid process() {\n\t// Called every frame per particle\n}\n"
 			"sky":
-				code = """shader_type sky;
+				content = "shader_type sky;\n\nvoid sky() {\n\tCOLOR = vec3(0.3, 0.5, 0.8);\n}\n"
 
-uniform vec4 top_color : source_color = vec4(0.3, 0.5, 0.9, 1.0);
-uniform vec4 bottom_color : source_color = vec4(0.9, 0.9, 1.0, 1.0);
+	# Ensure directory exists
+	var dir_path := path.get_base_dir()
+	if not DirAccess.dir_exists_absolute(dir_path):
+		DirAccess.make_dir_recursive_absolute(dir_path)
 
-void sky() {
-	COLOR = mix(bottom_color.rgb, top_color.rgb, clamp(EYEDIR.y * 0.5 + 0.5, 0.0, 1.0));
-}
-"""
-			_:
-				code = "shader_type canvas_item;\n\nvoid fragment() {\n\tCOLOR = texture(TEXTURE, UV);\n}\n"
-	var write := _write_text(path, code)
-	if write.has("__error"):
-		return write
-	return {"path": path, "template": template, "ok": true}
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return error_internal("Cannot create shader: %s" % error_string(FileAccess.get_open_error()))
+
+	file.store_string(content)
+	file.close()
+
+	get_editor().get_resource_filesystem().scan()
+
+	return success({"path": path, "shader_type": shader_type, "created": true})
 
 
-func _cmd_assign_shader_material(p: Dictionary) -> Dictionary:
-	var node := _find_node(String(p.get("path", "")))
+func _read_shader(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
+
+	if not FileAccess.file_exists(path):
+		return error_not_found("Shader '%s'" % path)
+
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return error_internal("Cannot read shader: %s" % error_string(FileAccess.get_open_error()))
+
+	var content := file.get_as_text()
+	file.close()
+
+	return success({"path": path, "content": content, "size": content.length()})
+
+
+func _edit_shader(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
+
+	if not FileAccess.file_exists(path):
+		return error_not_found("Shader '%s'" % path)
+
+	var changes_made := 0
+
+	if params.has("content"):
+		# Full replacement
+		var file := FileAccess.open(path, FileAccess.WRITE)
+		if file == null:
+			return error_internal("Cannot write shader")
+		file.store_string(str(params["content"]))
+		file.close()
+		changes_made = 1
+	elif params.has("replacements") and params["replacements"] is Array:
+		# Read current
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			return error_internal("Cannot read shader")
+		var content := file.get_as_text()
+		file.close()
+
+		for replacement in params["replacements"]:
+			if replacement is Dictionary:
+				var search: String = replacement.get("search", "")
+				var replace: String = replacement.get("replace", "")
+				if not search.is_empty() and content.contains(search):
+					content = content.replace(search, replace)
+					changes_made += 1
+
+		file = FileAccess.open(path, FileAccess.WRITE)
+		if file:
+			file.store_string(content)
+			file.close()
+
+	if changes_made > 0:
+		# Reload shader resource
+		get_editor().get_resource_filesystem().scan()
+		if ResourceLoader.exists(path):
+			var shader = load(path)
+			if shader is Shader:
+				shader.reload_from_file()
+
+	return success({"path": path, "changes_made": changes_made})
+
+
+func _assign_shader_material(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var result2 := require_string(params, "shader_path")
+	if result2[1] != null:
+		return result2[1]
+	var shader_path: String = result2[0]
+
+	var node := find_node_by_path(node_path)
 	if node == null:
-		return _error(-32602, "Node not found", "Pass valid path")
-	var shader_path := String(p.get("shaderPath", ""))
-	if shader_path.is_empty():
-		return _error(-32602, "Missing shaderPath", "Pass path to .gdshader file")
+		return error_not_found("Node at '%s'" % node_path)
+
+	if not ResourceLoader.exists(shader_path):
+		return error_not_found("Shader '%s'" % shader_path)
+
 	var shader: Shader = load(shader_path)
 	if shader == null:
-		return _error(-32011, "Shader not found: %s" % shader_path, "Verify file path")
-	var mat := ShaderMaterial.new()
-	mat.shader = shader
-	# Apply initial uniforms
-	var uniforms := p.get("uniforms", {})
-	if typeof(uniforms) == TYPE_DICTIONARY:
-		for key in uniforms.keys():
-			mat.set_shader_parameter(StringName(key), _parse_value(uniforms[key]))
-	# Assign to node
-	if node is CanvasItem and node.has_method("set"):
-		node.set("material", mat)
+		return error_internal("Failed to load shader")
+
+	var material := ShaderMaterial.new()
+	material.shader = shader
+
+	if node is CanvasItem:
+		(node as CanvasItem).material = material
 	elif node is MeshInstance3D:
-		(node as MeshInstance3D).set_surface_override_material(0, mat)
+		(node as MeshInstance3D).material_override = material
 	else:
-		node.set("material", mat)
-	return {"path": String(node.get_path()), "shader": shader_path, "ok": true}
+		# Try generic material property
+		if "material" in node:
+			node.set("material", material)
+		else:
+			return error_invalid_params("Node '%s' (%s) does not support materials" % [node_path, node.get_class()])
+
+	return success({"node_path": node_path, "shader_path": shader_path, "assigned": true})
 
 
-func _cmd_set_shader_param(p: Dictionary) -> Dictionary:
-	var node := _find_node(String(p.get("path", "")))
+func _set_shader_param(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var result2 := require_string(params, "param")
+	if result2[1] != null:
+		return result2[1]
+	var param_name: String = result2[0]
+
+	var node := find_node_by_path(node_path)
 	if node == null:
-		return _error(-32602, "Node not found", "Pass valid path")
-	var param_name := String(p.get("param", p.get("name", "")))
-	var value = _parse_value(p.get("value"))
-	if param_name.is_empty():
-		return _error(-32602, "Missing param", "Pass shader parameter name")
-	var mat = node.get("material")
-	if mat is ShaderMaterial:
-		(mat as ShaderMaterial).set_shader_parameter(StringName(param_name), value)
-		return {"path": String(node.get_path()), "param": param_name, "ok": true}
-	return _error(-32602, "No ShaderMaterial on node", "Assign shader material first")
+		return error_not_found("Node at '%s'" % node_path)
+
+	var material: ShaderMaterial = null
+	if node is CanvasItem and (node as CanvasItem).material is ShaderMaterial:
+		material = (node as CanvasItem).material
+	elif node is MeshInstance3D and (node as MeshInstance3D).material_override is ShaderMaterial:
+		material = (node as MeshInstance3D).material_override
+
+	if material == null:
+		return error(-32000, "Node has no ShaderMaterial")
+
+	var value = params.get("value")
+	if value is String:
+		var s: String = value
+		var expr := Expression.new()
+		if expr.parse(s) == OK:
+			var parsed = expr.execute()
+			if parsed != null:
+				value = parsed
+
+	material.set_shader_parameter(param_name, value)
+
+	return success({"node_path": node_path, "param": param_name, "value": str(value)})
 
 
-func _cmd_get_shader_params(p: Dictionary) -> Dictionary:
-	var node := _find_node(String(p.get("path", "")))
+func _get_shader_params(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+	var node_path: String = result[0]
+
+	var node := find_node_by_path(node_path)
 	if node == null:
-		return _error(-32602, "Node not found", "Pass valid path")
-	var mat = node.get("material")
-	if not (mat is ShaderMaterial):
-		return _error(-32602, "No ShaderMaterial", "Assign shader first")
-	var shader_mat := mat as ShaderMaterial
-	var params := {}
-	if shader_mat.shader:
-		for param in shader_mat.shader.get_shader_uniform_list():
-			var name := String(param.get("name", ""))
-			if not name.is_empty():
-				params[name] = _safe_value(shader_mat.get_shader_parameter(StringName(name)))
-	return {"path": String(node.get_path()), "params": params}
+		return error_not_found("Node at '%s'" % node_path)
+
+	var material: ShaderMaterial = null
+	if node is CanvasItem and (node as CanvasItem).material is ShaderMaterial:
+		material = (node as CanvasItem).material
+	elif node is MeshInstance3D and (node as MeshInstance3D).material_override is ShaderMaterial:
+		material = (node as MeshInstance3D).material_override
+
+	if material == null:
+		return error(-32000, "Node has no ShaderMaterial")
+
+	var shader_params: Dictionary = {}
+	for prop in material.get_property_list():
+		var pname: String = prop["name"]
+		if pname.begins_with("shader_parameter/"):
+			var key := pname.substr(17)
+			shader_params[key] = str(material.get(pname))
+
+	return success({"node_path": node_path, "params": shader_params})

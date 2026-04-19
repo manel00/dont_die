@@ -74,11 +74,13 @@ func _perform_attack() -> void:
 	
 	# DaÃ±o en Ã¡rea muy corto alcance
 	if multiplayer.is_server():
-		var enemies = get_tree().get_nodes_in_group("player")
-		for e in enemies:
-			if is_instance_valid(e) and e.global_position.distance_to(global_position) < attack_range:
-				if e.has_method("take_damage"): 
-					e.take_damage(attack_damage)
+		var players = get_tree().get_nodes_in_group("player")
+		for p in players:
+			if p.is_in_group("bots"):
+				continue
+			if is_instance_valid(p) and p.global_position.distance_to(global_position) < attack_range:
+				if p.has_method("take_damage"): 
+					p.take_damage(attack_damage)
 
 func die() -> void:
 	# Override para aÃ±adir efecto de muerte de minion (explosiÃ³n pequeÃ±a)

@@ -1,138 +1,204 @@
 @tool
 extends Node
 
-@export var start_port: int = 6505
-@export var max_port: int = 6509
+## Multi-connection WebSocket client.
+## Connects to multiple Node.js MCP server instances on ports 6505-6514.
+## Each Claude Code session gets its own port; Godot talks to all of them.
+## Ports 6505-6509: MCP servers (stdio), 6510-6514: CLI tool connections.
+
+signal client_connected()
+signal client_disconnected()
+signal message_received(text: String)
+signal command_executed(method: String, success: bool)
+signal command_completed(method: String, success: bool, response: String, source_port: int)
 
 var command_router: Node
 
-var _tcp_server := TCPServer.new()
-var _clients: Array[WebSocketPeer] = []
-var _active_port: int = -1
+const BASE_PORT := 6505
+const MAX_PORT := 6514
+const RECONNECT_INTERVAL := 3.0
+const BUFFER_SIZE := 16 * 1024 * 1024  # 16MB
+
+# Per-port connection state
+var _peers: Dictionary = {}  # port -> WebSocketPeer
+var _connected: Dictionary = {}  # port -> bool
+var _timers: Dictionary = {}  # port -> float (reconnect countdown)
+var _connect_times: Dictionary = {}  # port -> float (elapsed seconds since connect)
 var _running: bool = false
 
 
-func _process(_delta: float) -> void:
-	if not _running:
-		return
-	_accept_new_clients()
-	_poll_clients()
-
-
-func start_server() -> Dictionary:
-	if _running:
-		return {"ok": true, "port": _active_port, "already_running": true}
-
-	for port in range(start_port, max_port + 1):
-		var err := _tcp_server.listen(port)
-		if err == OK:
-			_active_port = port
-			_running = true
-			print("[MCP] WebSocket server listening on ws://127.0.0.1:%d" % port)
-			return {"ok": true, "port": port}
-
-	push_error("[MCP] Failed to bind WebSocket server on ports %d-%d" % [start_port, max_port])
-	return {
-		"ok": false,
-		"error": "No free port",
-		"port_range": "%d-%d" % [start_port, max_port]
-	}
+func start_server() -> void:
+	_running = true
+	for p in range(BASE_PORT, MAX_PORT + 1):
+		_connected[p] = false
+		_timers[p] = 0.0
+		_try_connect(p)
+	print("[MCP] Connecting to ports %d-%d" % [BASE_PORT, MAX_PORT])
 
 
 func stop_server() -> void:
 	_running = false
-	for i in range(_clients.size() - 1, -1, -1):
-		var client := _clients[i]
-		if client.get_ready_state() == WebSocketPeer.STATE_OPEN:
-			client.close()
-		_clients.remove_at(i)
-
-	if _active_port != -1:
-		print("[MCP] WebSocket server stopped on port %d" % _active_port)
-	_active_port = -1
-	_tcp_server.stop()
+	for p in _peers:
+		var ws: WebSocketPeer = _peers[p]
+		if ws:
+			ws.close(1000, "Plugin shutting down")
+	_peers.clear()
+	_connected.clear()
+	_timers.clear()
+	print("[MCP] WebSocket client stopped")
 
 
-func _accept_new_clients() -> void:
-	while _tcp_server.is_connection_available():
-		var connection := _tcp_server.take_connection()
-		var peer := WebSocketPeer.new()
-		var err := peer.accept_stream(connection)
-		if err == OK:
-			_clients.append(peer)
-			print("[MCP] Client connected")
-		else:
-			print("[MCP] Failed to accept websocket stream")
+func get_client_count() -> int:
+	var count: int = 0
+	for p in _connected:
+		if _connected[p]:
+			count += 1
+	return count
 
 
-func _poll_clients() -> void:
-	for i in range(_clients.size() - 1, -1, -1):
-		var client := _clients[i]
-		client.poll()
-		var state := client.get_ready_state()
-
-		if state == WebSocketPeer.STATE_OPEN:
-			while client.get_available_packet_count() > 0:
-				var text := client.get_packet().get_string_from_utf8()
-				_handle_request(client, text)
-		elif state == WebSocketPeer.STATE_CLOSED:
-			_clients.remove_at(i)
-			print("[MCP] Client disconnected")
+func get_connected_ports() -> Array[int]:
+	var ports: Array[int] = []
+	for p: int in _connected:
+		if _connected[p]:
+			ports.append(p)
+	return ports
 
 
-func _handle_request(client: WebSocketPeer, raw_text: String) -> void:
-	var parsed := JSON.parse_string(raw_text)
-	if typeof(parsed) != TYPE_DICTIONARY:
+func get_port_connect_time(port: int) -> float:
+	return _connect_times.get(port, -1.0)
+
+
+func _try_connect(p: int) -> void:
+	var ws := WebSocketPeer.new()
+	ws.outbound_buffer_size = BUFFER_SIZE
+	ws.inbound_buffer_size = BUFFER_SIZE
+	var err := ws.connect_to_url("ws://127.0.0.1:%d" % p)
+	if err == OK:
+		_peers[p] = ws
+	else:
+		_peers[p] = null
+
+
+func _process(delta: float) -> void:
+	if not _running:
 		return
 
-	var id: Variant = parsed.get("id", null)
-	var command := String(parsed.get("method", parsed.get("command", "")))
-	var payload: Variant = parsed.get("params", parsed.get("payload", {}))
-	if typeof(payload) != TYPE_DICTIONARY:
-		payload = {}
+	for p in range(BASE_PORT, MAX_PORT + 1):
+		var ws: WebSocketPeer = _peers.get(p)
 
-	if command.is_empty():
-		_send_error(client, id, -32600, "Missing method/command", "Send a valid MCP tool name")
+		# No peer - try reconnect on timer
+		if ws == null:
+			_timers[p] = _timers.get(p, 0.0) + delta
+			if _timers[p] >= RECONNECT_INTERVAL:
+				_timers[p] = 0.0
+				_try_connect(p)
+			continue
+
+		ws.poll()
+		var state := ws.get_ready_state()
+
+		match state:
+			WebSocketPeer.STATE_OPEN:
+				if not _connected.get(p, false):
+					_connected[p] = true
+					_connect_times[p] = 0.0
+					_timers[p] = 0.0
+					print_verbose("[MCP] Connected on port %d" % p)
+					client_connected.emit()
+				else:
+					_connect_times[p] = _connect_times.get(p, 0.0) + delta
+
+				while ws.get_available_packet_count() > 0:
+					var packet := ws.get_packet()
+					var text := packet.get_string_from_utf8()
+					_dispatch_message(text, p)
+
+			WebSocketPeer.STATE_CLOSING:
+				pass
+
+			WebSocketPeer.STATE_CLOSED:
+				if _connected.get(p, false):
+					_connected[p] = false
+					print_verbose("[MCP] Disconnected from port %d" % p)
+					client_disconnected.emit()
+				_peers[p] = null
+				_timers[p] = 0.0
+
+			WebSocketPeer.STATE_CONNECTING:
+				pass
+
+
+func _send_to_port(p: int, text: String) -> void:
+	var ws: WebSocketPeer = _peers.get(p)
+	if ws and _connected.get(p, false):
+		ws.send_text(text)
+
+
+func send_message(text: String) -> void:
+	# Broadcast to all connected peers
+	for p in _peers:
+		_send_to_port(p, text)
+
+
+## Synchronous dispatch - parse JSON, handle ping/pong, queue command execution
+func _dispatch_message(text: String, source_port: int) -> void:
+	message_received.emit(text)
+
+	var json := JSON.new()
+	var err := json.parse(text)
+	if err != OK:
+		_send_response(source_port, null, null, {"code": -32700, "message": "Parse error"})
 		return
 
-	if command_router == null:
-		_send_error(client, id, -32050, "Command router unavailable", "Re-enable plugin")
+	var msg: Variant = json.data
+	if not msg is Dictionary:
+		_send_response(source_port, null, null, {"code": -32600, "message": "Invalid request"})
 		return
 
-	var execution: Dictionary = command_router.execute(command, payload)
-	if execution.has("error"):
-		var err_obj: Dictionary = execution.error
-		_send_error(
-			client,
-			id,
-			int(err_obj.get("code", -32000)),
-			String(err_obj.get("message", "Command failed")),
-			String(err_obj.get("suggestion", ""))
-		)
+	var msg_dict: Dictionary = msg
+
+	if msg_dict.get("method") == "ping":
+		_send_to_port(source_port, JSON.stringify({"jsonrpc": "2.0", "method": "pong", "params": {}}))
 		return
 
-	_send_result(client, id, execution.get("result", {}))
+	if msg_dict.get("method") == "pong":
+		return
+
+	var id: Variant = msg_dict.get("id")
+	var method: String = msg_dict.get("method", "")
+	var params: Dictionary = msg_dict.get("params", {})
+
+	if method.is_empty():
+		_send_response(source_port, id, null, {"code": -32600, "message": "Missing method"})
+		return
+
+	if not command_router:
+		_send_response(source_port, id, null, {"code": -32603, "message": "No command router"})
+		return
+
+	_execute_command.call_deferred(source_port, id, method, params)
 
 
-func _send_result(client: WebSocketPeer, id: Variant, result: Variant) -> void:
-	var response := {
-		"jsonrpc": "2.0",
-		"id": id,
-		"result": result
-	}
-	client.send_text(JSON.stringify(response))
+func _execute_command(source_port: int, id: Variant, method: String, params: Dictionary) -> void:
+	var cmd_result: Dictionary = await command_router.execute(method, params)
+	if cmd_result.has("error"):
+		var err_data: Variant = cmd_result["error"]
+		_send_response(source_port, id, null, err_data)
+		var response_text := JSON.stringify(err_data)
+		command_executed.emit(method, false)
+		command_completed.emit(method, false, response_text, source_port)
+	else:
+		var result_data: Variant = cmd_result.get("result", {})
+		_send_response(source_port, id, result_data, null)
+		var response_text := JSON.stringify(result_data)
+		command_executed.emit(method, true)
+		command_completed.emit(method, true, response_text, source_port)
 
 
-func _send_error(client: WebSocketPeer, id: Variant, code: int, message: String, suggestion: String) -> void:
-	var response := {
-		"jsonrpc": "2.0",
-		"id": id,
-		"error": {
-			"code": code,
-			"message": message,
-			"data": {
-				"suggestion": suggestion
-			}
-		}
-	}
-	client.send_text(JSON.stringify(response))
+func _send_response(source_port: int, id: Variant, result: Variant, err: Variant) -> void:
+	var response: Dictionary = {"jsonrpc": "2.0", "id": id}
+	if err != null:
+		response["error"] = err
+	else:
+		response["result"] = result if result != null else {}
+	_send_to_port(source_port, JSON.stringify(response))

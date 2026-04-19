@@ -1,215 +1,383 @@
 @tool
-extends "res://addons/godot_mcp/commands/base_commands.gd"
-## Batch & refactoring commands: find, bulk set, dependencies.
+extends "res://addons/godot_mcp/commands/base_command.gd"
 
 
-func get_handlers() -> Dictionary:
+const PropertyParser := preload("res://addons/godot_mcp/utils/property_parser.gd")
+
+
+func get_commands() -> Dictionary:
 	return {
-		"find_nodes_by_type": Callable(self, "_cmd_find_nodes_by_type"),
-		"find_signal_connections": Callable(self, "_cmd_find_signal_connections"),
-		"batch_set_property": Callable(self, "_cmd_batch_set_property"),
-		"find_node_references": Callable(self, "_cmd_find_node_references"),
-		"get_scene_dependencies": Callable(self, "_cmd_get_scene_dependencies"),
-		"cross_scene_set_property": Callable(self, "_cmd_cross_scene_set_property"),
-		"find_script_references": Callable(self, "_cmd_find_script_references"),
-		"detect_circular_dependencies": Callable(self, "_cmd_detect_circular_dependencies"),
+		"find_nodes_by_type": _find_nodes_by_type,
+		"find_signal_connections": _find_signal_connections,
+		"batch_set_property": _batch_set_property,
+		"batch_add_nodes": _batch_add_nodes,
+		"find_node_references": _find_node_references,
+		"get_scene_dependencies": _get_scene_dependencies,
+		"cross_scene_set_property": _cross_scene_set_property,
 	}
 
 
-func _cmd_find_nodes_by_type(p: Dictionary) -> Dictionary:
-	var type_name := String(p.get("type", ""))
-	if type_name.is_empty():
-		return _error(-32602, "Missing type", "Pass class name like 'Sprite2D'")
-	var root := _edited_root()
+func _find_nodes_by_type(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "type")
+	if result[1] != null:
+		return result[1]
+	var type_name: String = result[0]
+
+	var root := get_edited_root()
 	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var matches: Array[Dictionary] = []
-	_find_by_type_recursive(root, type_name, matches)
-	return {"type": type_name, "count": matches.size(), "nodes": matches}
+		return error_no_scene()
+
+	var recursive: bool = optional_bool(params, "recursive", true)
+	var matches: Array = []
+	_search_by_type(root, type_name, recursive, matches)
+
+	return success({"type": type_name, "matches": matches, "count": matches.size()})
 
 
-func _find_by_type_recursive(node: Node, type_name: String, output: Array[Dictionary]) -> void:
+func _search_by_type(node: Node, type_name: String, recursive: bool, matches: Array) -> void:
 	if node.is_class(type_name) or node.get_class() == type_name:
-		output.append({"name": node.name, "path": String(node.get_path()), "type": node.get_class()})
-	for child in node.get_children():
-		_find_by_type_recursive(child, type_name, output)
+		var root := get_edited_root()
+		matches.append({
+			"name": node.name,
+			"path": str(root.get_path_to(node)),
+			"type": node.get_class(),
+		})
+	if recursive:
+		for child in node.get_children():
+			_search_by_type(child, type_name, recursive, matches)
 
 
-func _cmd_find_signal_connections(p: Dictionary) -> Dictionary:
-	var root_path := String(p.get("path", ""))
-	var root := _find_node(root_path) if not root_path.is_empty() else _edited_root()
+func _find_signal_connections(params: Dictionary) -> Dictionary:
+	var root := get_edited_root()
 	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var connections: Array[Dictionary] = []
-	_collect_signals_recursive(root, connections)
-	return {"count": connections.size(), "connections": connections}
+		return error_no_scene()
+
+	var signal_filter: String = optional_string(params, "signal_name", "")
+	var node_filter: String = optional_string(params, "node_path", "")
+
+	var connections: Array = []
+	_collect_signals(root, root, signal_filter, node_filter, connections)
+
+	return success({"connections": connections, "count": connections.size()})
 
 
-func _collect_signals_recursive(node: Node, output: Array[Dictionary]) -> void:
-	for sig in node.get_signal_list():
-		var sig_name := String(sig.get("name", ""))
-		for conn in node.get_signal_connection_list(sig_name):
-			var callable: Callable = conn.get("callable", Callable())
-			if callable.is_valid():
-				output.append({
-					"source": String(node.get_path()),
+func _collect_signals(node: Node, root: Node, signal_filter: String, node_filter: String, connections: Array) -> void:
+	var node_path := str(root.get_path_to(node))
+
+	if node_filter.is_empty() or node_path.contains(node_filter):
+		for sig_info in node.get_signal_list():
+			var sig_name: String = sig_info["name"]
+			if not signal_filter.is_empty() and not sig_name.contains(signal_filter):
+				continue
+			for conn in node.get_signal_connection_list(sig_name):
+				connections.append({
+					"source": node_path,
 					"signal": sig_name,
-					"target": String(callable.get_object().get_path()) if callable.get_object() is Node else "",
-					"method": callable.get_method()
+					"target": str(root.get_path_to(conn["callable"].get_object())),
+					"method": conn["callable"].get_method(),
 				})
+
 	for child in node.get_children():
-		_collect_signals_recursive(child, output)
+		_collect_signals(child, root, signal_filter, node_filter, connections)
 
 
-func _cmd_batch_set_property(p: Dictionary) -> Dictionary:
-	var type_filter := String(p.get("type", ""))
-	var property := String(p.get("property", ""))
-	var value = _parse_value(p.get("value"))
-	if property.is_empty():
-		return _error(-32602, "Missing property", "Pass property name")
-	var root := _edited_root()
+func _batch_set_property(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "type")
+	if result[1] != null:
+		return result[1]
+	var type_name: String = result[0]
+
+	var result2 := require_string(params, "property")
+	if result2[1] != null:
+		return result2[1]
+	var property: String = result2[0]
+
+	if not params.has("value"):
+		return error_invalid_params("Missing required parameter: value")
+	var value = params["value"]
+
+	# Parse value string
+	if value is String:
+		var s: String = value
+		var expr := Expression.new()
+		if expr.parse(s) == OK:
+			var parsed = expr.execute()
+			if parsed != null:
+				value = parsed
+
+	var root := get_edited_root()
 	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var changed := 0
-	_batch_set_recursive(root, type_filter, property, value, changed)
-	return {"property": property, "changed": changed, "ok": true}
+		return error_no_scene()
+
+	var affected: Array = []
+	_batch_set_recursive(root, root, type_name, property, value, affected)
+
+	return success({"property": property, "affected": affected, "count": affected.size()})
 
 
-func _batch_set_recursive(node: Node, type_filter: String, property: String, value: Variant, changed: int) -> int:
-	if type_filter.is_empty() or node.is_class(type_filter) or node.get_class() == type_filter:
-		if node.has_method("get") and node.get(StringName(property)) != null:
-			_undo().set_property(node, StringName(property), value)
-			changed += 1
+func _batch_set_recursive(node: Node, root: Node, type_name: String, property: String, value: Variant, affected: Array) -> void:
+	if node.is_class(type_name) or node.get_class() == type_name:
+		if property in node:
+			node.set(property, value)
+			affected.append(str(root.get_path_to(node)))
 	for child in node.get_children():
-		changed = _batch_set_recursive(child, type_filter, property, value, changed)
-	return changed
+		_batch_set_recursive(child, root, type_name, property, value, affected)
 
 
-func _cmd_find_node_references(p: Dictionary) -> Dictionary:
-	var node_name := String(p.get("nodeName", ""))
-	if node_name.is_empty():
-		return _error(-32602, "Missing nodeName", "Pass node name to search")
-	var files: Array[String] = []
-	_collect_files("res://", files, 3000)
-	var matches: Array[Dictionary] = []
-	for fp in files:
-		if not (fp.ends_with(".gd") or fp.ends_with(".tscn") or fp.ends_with(".tres")):
+func _batch_add_nodes(params: Dictionary) -> Dictionary:
+	if not params.has("nodes") or not params["nodes"] is Array:
+		return error_invalid_params("Missing required parameter: nodes (Array)")
+
+	var nodes_data: Array = params["nodes"]
+	if nodes_data.is_empty():
+		return error_invalid_params("nodes array is empty")
+
+	var root := get_edited_root()
+	if root == null:
+		return error_no_scene()
+
+	var created: Array = []
+	var errors: Array = []
+
+	var undo_redo := get_undo_redo()
+	undo_redo.create_action("MCP: Batch add %d nodes" % nodes_data.size())
+
+	for i: int in nodes_data.size():
+		var entry: Dictionary = nodes_data[i]
+
+		if not entry.has("type") or not entry["type"] is String:
+			errors.append({"index": i, "error": "Missing or invalid 'type'"})
 			continue
-		var text := _read_text(fp)
-		if text == null:
+
+		var type: String = entry["type"]
+		if not ClassDB.class_exists(type):
+			errors.append({"index": i, "error": "Unknown node type: %s" % type})
 			continue
-		if text.contains(node_name):
-			matches.append({"path": fp})
-	return {"nodeName": node_name, "count": matches.size(), "matches": matches}
 
+		var parent_path: String = entry.get("parent_path", ".") if entry.has("parent_path") and entry["parent_path"] is String else "."
+		var node_name: String = entry.get("name", "") if entry.has("name") and entry["name"] is String else ""
+		var properties: Dictionary = entry.get("properties", {}) if entry.has("properties") and entry["properties"] is Dictionary else {}
 
-func _cmd_get_scene_dependencies(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	if path.is_empty():
-		var root := _edited_root()
-		if root:
-			path = root.scene_file_path
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass scene path")
-	var content := _read_text(path)
-	if content == null:
-		return _error(-32011, "Cannot read: %s" % path, "Verify path")
-	var deps: Array[String] = []
-	for line in content.split("\n"):
-		if line.contains("ext_resource") and line.contains("path="):
-			var start := line.find("path=\"") + 6
-			var end := line.find("\"", start)
-			if start > 5 and end > start:
-				deps.append(line.substr(start, end - start))
-	return {"path": path, "count": deps.size(), "dependencies": deps}
-
-
-func _cmd_cross_scene_set_property(p: Dictionary) -> Dictionary:
-	var property := String(p.get("property", ""))
-	var value := String(p.get("value", ""))
-	var type_filter := String(p.get("type", ""))
-	var find_text := String(p.get("find", ""))
-	var replace_text := String(p.get("replace", ""))
-	if property.is_empty() and find_text.is_empty():
-		return _error(-32602, "Missing property or find/replace", "Pass property+value OR find+replace")
-	var files: Array[String] = []
-	_collect_files("res://", files, 3000)
-	var modified := 0
-	for fp in files:
-		if not fp.ends_with(".tscn"):
+		var parent := find_node_by_path(parent_path)
+		if parent == null:
+			errors.append({"index": i, "error": "Parent node '%s' not found" % parent_path})
 			continue
-		var text := _read_text(fp)
-		if text == null:
+
+		var node: Node = ClassDB.instantiate(type)
+		if not node_name.is_empty():
+			node.name = node_name
+
+		for prop_name: String in properties:
+			var prop_exists := false
+			for prop in node.get_property_list():
+				if prop["name"] == prop_name:
+					prop_exists = true
+					break
+			if prop_exists:
+				var current: Variant = node.get(prop_name)
+				var target_type := typeof(current)
+				node.set(prop_name, PropertyParser.parse_value(properties[prop_name], target_type))
+
+		# Add directly so subsequent nodes can reference this as parent
+		parent.add_child(node)
+		node.set_owner(root)
+
+		# Register undo/redo (do methods re-add on redo, undo removes)
+		undo_redo.add_do_method(parent, "add_child", node)
+		undo_redo.add_do_method(node, "set_owner", root)
+		undo_redo.add_do_reference(node)
+		undo_redo.add_undo_method(parent, "remove_child", node)
+
+		created.append({
+			"index": i,
+			"type": type,
+			"name": str(node.name),
+			"parent": parent_path,
+			"node_path": str(root.get_path_to(node)),
+		})
+
+	# Commit without re-executing do methods (nodes already added)
+	undo_redo.commit_action(false)
+
+	var result := {"created": created, "count": created.size()}
+	if not errors.is_empty():
+		result["errors"] = errors
+	return success(result)
+
+
+func _find_node_references(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "pattern")
+	if result[1] != null:
+		return result[1]
+	var pattern: String = result[0]
+
+	# Search through all .tscn and .gd files for references
+	var matches: Array = []
+	_search_files_for_pattern("res://", pattern, matches, 100)
+
+	return success({"pattern": pattern, "matches": matches, "count": matches.size()})
+
+
+func _search_files_for_pattern(path: String, pattern: String, matches: Array, max_results: int) -> void:
+	if matches.size() >= max_results:
+		return
+
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+
+	while not file_name.is_empty() and matches.size() < max_results:
+		if file_name.begins_with("."):
+			file_name = dir.get_next()
 			continue
-		var new_text := text
-		if not find_text.is_empty():
-			new_text = text.replace(find_text, replace_text)
-		if new_text != text:
-			_write_text(fp, new_text)
-			modified += 1
-	return {"modified": modified, "ok": true}
+
+		var full_path := path.path_join(file_name)
+
+		if dir.current_is_dir():
+			_search_files_for_pattern(full_path, pattern, matches, max_results)
+		elif file_name.get_extension() in ["tscn", "gd", "tres", "gdshader"]:
+			var file := FileAccess.open(full_path, FileAccess.READ)
+			if file:
+				var content := file.get_as_text()
+				file.close()
+				if content.contains(pattern):
+					# Find line numbers
+					var lines := content.split("\n")
+					var line_matches: Array = []
+					for i in lines.size():
+						if lines[i].contains(pattern):
+							line_matches.append(i + 1)
+							if line_matches.size() >= 5:
+								break
+					matches.append({
+						"file": full_path,
+						"lines": line_matches,
+					})
+
+		file_name = dir.get_next()
+	dir.list_dir_end()
 
 
-func _cmd_find_script_references(p: Dictionary) -> Dictionary:
-	var script_path := String(p.get("scriptPath", ""))
-	if script_path.is_empty():
-		return _error(-32602, "Missing scriptPath", "Pass payload.scriptPath")
-	var files: Array[String] = []
-	_collect_files("res://", files, 3000)
-	var matches: Array[Dictionary] = []
-	for fp in files:
-		if not (fp.ends_with(".tscn") or fp.ends_with(".tres") or fp.ends_with(".gd")):
+func _cross_scene_set_property(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "type")
+	if result[1] != null:
+		return result[1]
+	var type_name: String = result[0]
+
+	var result2 := require_string(params, "property")
+	if result2[1] != null:
+		return result2[1]
+	var property: String = result2[0]
+
+	if not params.has("value"):
+		return error_invalid_params("Missing required parameter: value")
+	var value = params["value"]
+
+	# Parse value string
+	if value is String:
+		var expr := Expression.new()
+		if expr.parse(value) == OK:
+			var parsed = expr.execute()
+			if parsed != null:
+				value = parsed
+
+	var path_filter: String = optional_string(params, "path_filter", "res://")
+	var exclude_addons: bool = optional_bool(params, "exclude_addons", true)
+
+	var scenes_affected: Array = []
+	var total_nodes: int = 0
+	var scene_files: Array = []
+	_collect_scene_files(path_filter, scene_files, exclude_addons)
+
+	for scene_path: String in scene_files:
+		var packed: PackedScene = ResourceLoader.load(scene_path) as PackedScene
+		if packed == null:
 			continue
-		var text := _read_text(fp)
-		if text == null:
+		var instance: Node = packed.instantiate()
+		if instance == null:
 			continue
-		if text.contains(script_path):
-			matches.append({"path": fp})
-	return {"scriptPath": script_path, "count": matches.size(), "matches": matches}
+
+		var affected_nodes: Array = []
+		_cross_scene_set_recursive(instance, instance, type_name, property, value, affected_nodes)
+
+		if not affected_nodes.is_empty():
+			# Pack and save
+			var new_packed := PackedScene.new()
+			new_packed.pack(instance)
+			ResourceSaver.save(new_packed, scene_path)
+			scenes_affected.append({
+				"scene": scene_path,
+				"nodes": affected_nodes,
+				"count": affected_nodes.size(),
+			})
+			total_nodes += affected_nodes.size()
+
+		instance.free()
+
+	# Rescan filesystem so editor picks up changes
+	if not scenes_affected.is_empty():
+		get_editor().get_resource_filesystem().scan()
+
+	return success({
+		"type": type_name,
+		"property": property,
+		"scenes_affected": scenes_affected,
+		"total_scenes": scenes_affected.size(),
+		"total_nodes": total_nodes,
+	})
 
 
-func _cmd_detect_circular_dependencies(p: Dictionary) -> Dictionary:
-	var files: Array[String] = []
-	_collect_files("res://", files, 3000)
-	# Build dependency graph
-	var graph: Dictionary = {} # path -> [dependencies]
-	for fp in files:
-		if not fp.ends_with(".tscn"):
+func _collect_scene_files(path: String, files: Array, exclude_addons: bool) -> void:
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while not file_name.is_empty():
+		if file_name.begins_with("."):
+			file_name = dir.get_next()
 			continue
-		var content := _read_text(fp)
-		if content == null:
-			continue
-		var deps: Array[String] = []
-		for line in content.split("\n"):
-			if line.contains("ext_resource") and line.contains("path="):
-				var start := line.find("path=\"") + 6
-				var end := line.find("\"", start)
-				if start > 5 and end > start:
-					var dep := line.substr(start, end - start)
-					if dep.ends_with(".tscn"):
-						deps.append(dep)
-		graph[fp] = deps
-	# Detect cycles using DFS
-	var visited := {}
-	var in_stack := {}
-	var cycles: Array[Array] = []
-	for node in graph.keys():
-		if not visited.has(node):
-			_dfs_cycle(node, graph, visited, in_stack, [], cycles)
-	return {"cycles": cycles, "has_cycles": not cycles.is_empty()}
+		var full_path := path.path_join(file_name)
+		if dir.current_is_dir():
+			if exclude_addons and file_name == "addons":
+				file_name = dir.get_next()
+				continue
+			_collect_scene_files(full_path, files, exclude_addons)
+		elif file_name.get_extension() == "tscn":
+			files.append(full_path)
+		file_name = dir.get_next()
+	dir.list_dir_end()
 
 
-func _dfs_cycle(node: String, graph: Dictionary, visited: Dictionary, in_stack: Dictionary, path: Array, cycles: Array[Array]) -> void:
-	visited[node] = true
-	in_stack[node] = true
-	path.append(node)
-	var deps: Array = graph.get(node, [])
-	for dep in deps:
-		if not visited.has(dep):
-			_dfs_cycle(dep, graph, visited, in_stack, path.duplicate(), cycles)
-		elif in_stack.has(dep) and in_stack[dep]:
-			# Cycle found
-			var cycle_start := path.find(dep)
-			if cycle_start >= 0:
-				cycles.append(path.slice(cycle_start))
-	in_stack[node] = false
+func _cross_scene_set_recursive(node: Node, root: Node, type_name: String, property: String, value: Variant, affected: Array) -> void:
+	if node.is_class(type_name) or node.get_class() == type_name:
+		if property in node:
+			node.set(property, value)
+			affected.append(str(root.get_path_to(node)))
+	for child in node.get_children():
+		_cross_scene_set_recursive(child, root, type_name, property, value, affected)
+
+
+func _get_scene_dependencies(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
+
+	if not FileAccess.file_exists(path):
+		return error_not_found("File '%s'" % path)
+
+	var deps := ResourceLoader.get_dependencies(path)
+	var dependencies: Array = []
+	for dep: String in deps:
+		# Format: "path::type"
+		var parts := dep.split("::")
+		dependencies.append({
+			"path": parts[0] if parts.size() > 0 else dep,
+			"type": parts[2] if parts.size() > 2 else "",
+		})
+
+	return success({"path": path, "dependencies": dependencies, "count": dependencies.size()})

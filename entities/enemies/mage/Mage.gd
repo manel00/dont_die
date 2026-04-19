@@ -147,7 +147,11 @@ func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spre
 	material.emission = emission
 	material.emission_energy_multiplier = 3.0
 	
-	get_tree().current_scene.add_child(proj)
+	var scene := get_tree().current_scene
+	if not scene:
+		proj.queue_free()
+		return
+	scene.add_child(proj)
 	
 	# PosiciÃ³n de spawn con offset para cada proyectil
 	var spawn_offset := Vector3(0, 0.5 + (spread_index * 0.1), 0)

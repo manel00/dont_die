@@ -25,7 +25,8 @@ const RADAR_UPDATE_INTERVAL: float = 0.1  # Update every 0.1s instead of every f
 var _radar_dots: Array[ColorRect] = []
 var _player: Node3D = null
 var _radar_update_timer: float = 0.0
-var _cached_enemies: Array = []  # noqa: ARG001
+@warning_ignore("unused_variable")
+var _cached_enemies: Array = []
 
 # Ability cooldown tracking
 var _ability_cooldowns: Dictionary = {

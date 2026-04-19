@@ -1,110 +1,189 @@
 @tool
-extends "res://addons/godot_mcp/commands/base_commands.gd"
-## Resource commands: read, edit, create resources; autoload management; preview.
+extends "res://addons/godot_mcp/commands/base_command.gd"
+
+const PropertyParser := preload("res://addons/godot_mcp/utils/property_parser.gd")
 
 
-func get_handlers() -> Dictionary:
+func get_commands() -> Dictionary:
 	return {
-		"read_resource": Callable(self, "_cmd_read_resource"),
-		"edit_resource": Callable(self, "_cmd_edit_resource"),
-		"create_resource": Callable(self, "_cmd_create_resource"),
-		"get_resource_preview": Callable(self, "_cmd_get_resource_preview"),
-		"add_autoload": Callable(self, "_cmd_add_autoload"),
-		"remove_autoload": Callable(self, "_cmd_remove_autoload"),
+		"read_resource": _read_resource,
+		"edit_resource": _edit_resource,
+		"create_resource": _create_resource,
+		"get_resource_preview": _get_resource_preview,
 	}
 
 
-func _cmd_read_resource(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass payload.path")
-	if not ResourceLoader.exists(path):
-		return _error(-32011, "Resource not found: %s" % path, "Verify file path")
-	var res := load(path)
-	if res == null:
-		return _error(-32011, "Failed to load: %s" % path, "Check file format")
-	var properties := {}
-	for prop in res.get_property_list():
-		var key := String(prop.get("name", ""))
-		if key.is_empty() or key.begins_with("_"):
+func _read_resource(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
+
+	if not FileAccess.file_exists(path):
+		return error_not_found("Resource '%s'" % path)
+
+	var resource: Resource = ResourceLoader.load(path)
+	if resource == null:
+		return error_internal("Failed to load resource: %s" % path)
+
+	var props: Dictionary = {}
+	for prop_info in resource.get_property_list():
+		var prop_name: String = prop_info["name"]
+		var usage: int = prop_info["usage"]
+		if not (usage & PROPERTY_USAGE_EDITOR):
 			continue
-		var usage := int(prop.get("usage", 0))
-		if usage & PROPERTY_USAGE_EDITOR or usage & PROPERTY_USAGE_STORAGE:
-			properties[key] = _safe_value(res.get(StringName(key)))
-	return {"path": path, "type": res.get_class(), "properties": properties}
+		if prop_name.begins_with("_") or prop_name == "script" or prop_name == "resource_local_to_scene" or prop_name == "resource_name" or prop_name == "resource_path":
+			continue
+		props[prop_name] = PropertyParser.serialize_value(resource.get(prop_name))
+
+	return success({
+		"path": path,
+		"type": resource.get_class(),
+		"resource_name": resource.resource_name,
+		"properties": props,
+	})
 
 
-func _cmd_edit_resource(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass payload.path")
-	var res := load(path)
-	if res == null:
-		return _error(-32011, "Resource not found: %s" % path, "Check path")
-	var properties := p.get("properties", {})
-	if typeof(properties) != TYPE_DICTIONARY:
-		return _error(-32602, "Missing properties", "Pass {property: value}")
-	var parsed := _parse_properties(properties)
-	for key in parsed.keys():
-		res.set(StringName(key), parsed[key])
-	var err := ResourceSaver.save(res, path)
+func _edit_resource(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
+
+	if not params.has("properties") or not params["properties"] is Dictionary:
+		return error_invalid_params("'properties' dictionary is required")
+	var new_props: Dictionary = params["properties"]
+
+	if not FileAccess.file_exists(path):
+		return error_not_found("Resource '%s'" % path)
+
+	var resource: Resource = ResourceLoader.load(path)
+	if resource == null:
+		return error_internal("Failed to load resource: %s" % path)
+
+	var changed: Dictionary = {}
+	for prop_name: String in new_props:
+		if not prop_name in resource:
+			continue
+		var old_value: Variant = resource.get(prop_name)
+		var target_type := typeof(old_value)
+		var new_value: Variant = PropertyParser.parse_value(new_props[prop_name], target_type)
+		resource.set(prop_name, new_value)
+		changed[prop_name] = {
+			"old": PropertyParser.serialize_value(old_value),
+			"new": PropertyParser.serialize_value(resource.get(prop_name)),
+		}
+
+	if changed.is_empty():
+		return success({"path": path, "changed": {}, "message": "No properties were changed"})
+
+	var err := ResourceSaver.save(resource, path)
 	if err != OK:
-		return _error(-32013, "Failed to save resource", "Check file permissions")
-	return {"path": path, "ok": true}
+		return error_internal("Failed to save resource: %s" % error_string(err))
+
+	return success({
+		"path": path,
+		"type": resource.get_class(),
+		"changed": changed,
+	})
 
 
-func _cmd_create_resource(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	var resource_type := String(p.get("type", "Resource"))
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass payload.path")
-	var res = ClassDB.instantiate(resource_type)
-	if res == null or not (res is Resource):
-		return _error(-32602, "Invalid resource type: %s" % resource_type, "Use valid Resource class")
-	var properties := p.get("properties", {})
-	if typeof(properties) == TYPE_DICTIONARY:
-		var parsed := _parse_properties(properties)
-		for key in parsed.keys():
-			res.set(StringName(key), parsed[key])
-	var err := ResourceSaver.save(res, path)
+func _create_resource(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
+
+	var result2 := require_string(params, "type")
+	if result2[1] != null:
+		return result2[1]
+	var resource_type: String = result2[0]
+
+	if not ClassDB.class_exists(resource_type):
+		return error_invalid_params("Unknown resource type: %s" % resource_type)
+	if not ClassDB.is_parent_class(resource_type, "Resource"):
+		return error_invalid_params("'%s' is not a Resource type" % resource_type)
+
+	var overwrite: bool = optional_bool(params, "overwrite", false)
+	if FileAccess.file_exists(path) and not overwrite:
+		return error(-32000, "Resource already exists: %s" % path, {"suggestion": "Set overwrite=true to replace"})
+
+	var resource: Resource = ClassDB.instantiate(resource_type)
+	if resource == null:
+		return error_internal("Failed to instantiate: %s" % resource_type)
+
+	# Apply properties
+	var properties: Dictionary = params.get("properties", {})
+	for prop_name: String in properties:
+		if prop_name in resource:
+			var current := resource.get(prop_name)
+			resource.set(prop_name, PropertyParser.parse_value(properties[prop_name], typeof(current)))
+
+	var err := ResourceSaver.save(resource, path)
 	if err != OK:
-		return _error(-32013, "Failed to save: %s" % path, "Ensure folder exists")
-	return {"path": path, "type": resource_type, "ok": true}
+		return error_internal("Failed to save resource: %s" % error_string(err))
+
+	# Rescan filesystem
+	get_editor().get_resource_filesystem().scan()
+
+	return success({
+		"path": path,
+		"type": resource_type,
+		"properties_set": properties.keys(),
+	})
 
 
-func _cmd_get_resource_preview(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass payload.path")
-	if not editor_plugin:
-		return _error(-32050, "Not in editor", "Run from editor")
-	var ei := editor_plugin.get_editor_interface()
-	var previewer := ei.get_resource_previewer()
-	# Resource previewer is async; we return what info we can
-	return {"path": path, "info": "Preview generation is async; use get_editor_screenshot for captures", "ok": true}
+func _get_resource_preview(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "path")
+	if result[1] != null:
+		return result[1]
+	var path: String = result[0]
 
+	if not FileAccess.file_exists(path):
+		return error_not_found("Resource '%s'" % path)
 
-func _cmd_add_autoload(p: Dictionary) -> Dictionary:
-	var name := String(p.get("name", ""))
-	var path := String(p.get("path", ""))
-	if name.is_empty() or path.is_empty():
-		return _error(-32602, "Missing name or path", "Pass name and path")
-	var setting_key := "autoload/%s" % name
-	# Autoload paths prefixed with * are singletons
-	var singleton := bool(p.get("singleton", true))
-	var value := ("*" if singleton else "") + path
-	ProjectSettings.set_setting(setting_key, value)
-	ProjectSettings.save()
-	return {"name": name, "path": path, "singleton": singleton, "ok": true}
+	var max_size: int = optional_int(params, "max_size", 256)
+	var image: Image = null
 
+	# Try loading as image file directly
+	var ext := path.get_extension().to_lower()
+	if ext in ["png", "jpg", "jpeg", "bmp", "webp", "svg"]:
+		image = Image.new()
+		var err := image.load(path)
+		if err != OK:
+			return error_internal("Failed to load image: %s" % error_string(err))
+	else:
+		# Try loading as resource and extracting image
+		var resource: Resource = ResourceLoader.load(path)
+		if resource == null:
+			return error_internal("Failed to load resource: %s" % path)
 
-func _cmd_remove_autoload(p: Dictionary) -> Dictionary:
-	var name := String(p.get("name", ""))
-	if name.is_empty():
-		return _error(-32602, "Missing name", "Pass payload.name")
-	var setting_key := "autoload/%s" % name
-	if not ProjectSettings.has_setting(setting_key):
-		return _error(-32011, "Autoload not found: %s" % name, "Check name")
-	ProjectSettings.set_setting(setting_key, null)
-	ProjectSettings.save()
-	return {"name": name, "ok": true}
+		if resource is Texture2D:
+			image = (resource as Texture2D).get_image()
+		elif resource is Image:
+			image = resource as Image
+		else:
+			return error_invalid_params("Resource type '%s' does not have an image preview" % resource.get_class())
+
+	if image == null:
+		return error_internal("Could not extract image from resource")
+
+	# Resize if needed
+	if image.get_width() > max_size or image.get_height() > max_size:
+		var scale_x := float(max_size) / float(image.get_width())
+		var scale_y := float(max_size) / float(image.get_height())
+		var scale := minf(scale_x, scale_y)
+		var new_w := int(image.get_width() * scale)
+		var new_h := int(image.get_height() * scale)
+		image.resize(new_w, new_h, Image.INTERPOLATE_LANCZOS)
+
+	var png_buffer := image.save_png_to_buffer()
+	var base64 := Marshalls.raw_to_base64(png_buffer)
+
+	return success({
+		"image_base64": base64,
+		"width": image.get_width(),
+		"height": image.get_height(),
+		"format": "png",
+		"path": path,
+	})

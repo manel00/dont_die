@@ -1,106 +1,120 @@
 @tool
 extends Node
-## Command router — loads all command handler files and dispatches requests.
 
 var editor_plugin: EditorPlugin
 
-var _command_handlers: Dictionary = {}
-var _tool_aliases: Dictionary = {}
+var _command_handlers: Dictionary = {}  # method_name -> Callable
+var _disabled_tools: Dictionary = {}  # method_name -> true
 
-var _handler_files: Array[String] = [
-	"res://addons/godot_mcp/commands/core_commands.gd",
-	"res://addons/godot_mcp/commands/editor_commands.gd",
-	"res://addons/godot_mcp/commands/input_commands.gd",
-	"res://addons/godot_mcp/commands/runtime_commands.gd",
-	"res://addons/godot_mcp/commands/animation_commands.gd",
-	"res://addons/godot_mcp/commands/animation_tree_commands.gd",
-	"res://addons/godot_mcp/commands/tilemap_commands.gd",
-	"res://addons/godot_mcp/commands/scene3d_commands.gd",
-	"res://addons/godot_mcp/commands/physics_commands.gd",
-	"res://addons/godot_mcp/commands/particles_commands.gd",
-	"res://addons/godot_mcp/commands/navigation_commands.gd",
-	"res://addons/godot_mcp/commands/audio_commands.gd",
-	"res://addons/godot_mcp/commands/theme_commands.gd",
-	"res://addons/godot_mcp/commands/shader_commands.gd",
-	"res://addons/godot_mcp/commands/resource_commands.gd",
-	"res://addons/godot_mcp/commands/batch_commands.gd",
-	"res://addons/godot_mcp/commands/testing_commands.gd",
-	"res://addons/godot_mcp/commands/analysis_commands.gd",
-	"res://addons/godot_mcp/commands/profiling_commands.gd",
-	"res://addons/godot_mcp/commands/export_commands.gd",
-]
+const TOOL_CONFIG_PATH := "user://mcp_tool_config.cfg"
 
 
 func _ready() -> void:
+	_load_tool_config()
 	_register_commands()
 
 
 func _register_commands() -> void:
-	_command_handlers.clear()
-	_tool_aliases.clear()
+	var command_classes := [
+		preload("res://addons/godot_mcp/commands/project_commands.gd"),
+		preload("res://addons/godot_mcp/commands/scene_commands.gd"),
+		preload("res://addons/godot_mcp/commands/node_commands.gd"),
+		preload("res://addons/godot_mcp/commands/script_commands.gd"),
+		preload("res://addons/godot_mcp/commands/editor_commands.gd"),
+		preload("res://addons/godot_mcp/commands/input_commands.gd"),
+		preload("res://addons/godot_mcp/commands/runtime_commands.gd"),
+		preload("res://addons/godot_mcp/commands/animation_commands.gd"),
+		preload("res://addons/godot_mcp/commands/tilemap_commands.gd"),
+		preload("res://addons/godot_mcp/commands/theme_commands.gd"),
+		preload("res://addons/godot_mcp/commands/profiling_commands.gd"),
+		preload("res://addons/godot_mcp/commands/batch_commands.gd"),
+		preload("res://addons/godot_mcp/commands/shader_commands.gd"),
+		preload("res://addons/godot_mcp/commands/export_commands.gd"),
+		preload("res://addons/godot_mcp/commands/resource_commands.gd"),
+		preload("res://addons/godot_mcp/commands/input_map_commands.gd"),
+		preload("res://addons/godot_mcp/commands/scene_3d_commands.gd"),
+		preload("res://addons/godot_mcp/commands/physics_commands.gd"),
+		preload("res://addons/godot_mcp/commands/analysis_commands.gd"),
+		preload("res://addons/godot_mcp/commands/animation_tree_commands.gd"),
+		preload("res://addons/godot_mcp/commands/audio_commands.gd"),
+		preload("res://addons/godot_mcp/commands/navigation_commands.gd"),
+		preload("res://addons/godot_mcp/commands/particle_commands.gd"),
+		preload("res://addons/godot_mcp/commands/test_commands.gd"),
+		preload("res://addons/godot_mcp/commands/android_commands.gd"),
+	]
 
-	for handler_path in _handler_files:
-		var script = load(handler_path)
-		if script == null:
-			push_warning("[MCP] Failed to load handler: %s" % handler_path)
-			continue
+	for cmd_class in command_classes:
+		var cmd: Node = cmd_class.new()
+		cmd.editor_plugin = editor_plugin
+		add_child(cmd)
+		var methods: Dictionary = cmd.get_commands()
+		for method_name: String in methods:
+			_command_handlers[method_name] = methods[method_name]
 
-		var instance: Object = script.new()
-		if instance == null:
-			push_warning("[MCP] Failed to instantiate handler: %s" % handler_path)
-			continue
-
-		instance.set_editor_plugin(editor_plugin)
-
-		# Register handlers
-		var handlers: Dictionary = instance.get_handlers()
-		for key in handlers.keys():
-			if _command_handlers.has(key):
-				push_warning("[MCP] Duplicate handler: %s (from %s)" % [key, handler_path])
-			_command_handlers[key] = handlers[key]
-
-		# Register aliases
-		var aliases: Dictionary = instance.get_aliases()
-		for key in aliases.keys():
-			_tool_aliases[key] = aliases[key]
-
-	print("[MCP] Registered %d command handlers + %d aliases from %d modules" % [
-		_command_handlers.size(), _tool_aliases.size(), _handler_files.size()
-	])
+	print("[MCP] Registered %d commands" % _command_handlers.size())
 
 
-func execute(command: String, payload: Dictionary) -> Dictionary:
-	var target := command
-	if _tool_aliases.has(command):
-		target = String(_tool_aliases[command])
-
-	if not _command_handlers.has(target):
+func execute(method: String, params: Dictionary) -> Dictionary:
+	if not _command_handlers.has(method):
 		return {
 			"error": {
 				"code": -32601,
-				"message": "Tool '%s' is not implemented in this bridge yet" % command,
-				"suggestion": "Use implemented core tools first or extend handlers"
+				"message": "Method not found: %s" % method,
+				"data": {"available_methods": _command_handlers.keys()}
 			}
 		}
 
-	var callable: Callable = _command_handlers[target]
-	var result = callable.call(payload)
+	if _disabled_tools.has(method):
+		return {
+			"error": {
+				"code": -32603,
+				"message": "Tool '%s' is disabled in MCP Server settings" % method
+			}
+		}
 
-	# Handle async results (Callable returns Signal/Coroutine)
-	if result is Signal:
-		result = await result
-
-	if typeof(result) == TYPE_DICTIONARY and result.has("__error"):
-		return {"error": result.get("__error")}
-
-	return {
-		"result": result
-	}
+	var handler: Callable = _command_handlers[method]
+	var result: Dictionary = await handler.call(params)
+	return result
 
 
-func get_registered_commands() -> Array[String]:
-	var keys: Array[String] = []
-	for key in _command_handlers.keys():
-		keys.append(String(key))
-	keys.sort()
-	return keys
+func get_available_methods() -> Array:
+	return _command_handlers.keys()
+
+
+func is_tool_disabled(method: String) -> bool:
+	return _disabled_tools.has(method)
+
+
+func set_tool_disabled(method: String, disabled: bool) -> void:
+	if disabled:
+		_disabled_tools[method] = true
+	else:
+		_disabled_tools.erase(method)
+	_save_tool_config()
+
+
+func set_all_tools_disabled(disabled: bool) -> void:
+	if disabled:
+		for method: String in _command_handlers:
+			_disabled_tools[method] = true
+	else:
+		_disabled_tools.clear()
+	_save_tool_config()
+
+
+func _load_tool_config() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(TOOL_CONFIG_PATH) != OK:
+		return
+	if not cfg.has_section("disabled_tools"):
+		return
+	for method: String in cfg.get_section_keys("disabled_tools"):
+		if cfg.get_value("disabled_tools", method, false):
+			_disabled_tools[method] = true
+
+
+func _save_tool_config() -> void:
+	var cfg := ConfigFile.new()
+	for method: String in _disabled_tools:
+		cfg.set_value("disabled_tools", method, true)
+	cfg.save(TOOL_CONFIG_PATH)

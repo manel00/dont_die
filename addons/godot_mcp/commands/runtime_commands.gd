@@ -1,295 +1,398 @@
 @tool
-extends "res://addons/godot_mcp/commands/base_commands.gd"
-## Runtime analysis commands: live game inspection, capture, recording, UI.
+extends "res://addons/godot_mcp/commands/base_command.gd"
 
-var _recordings: Dictionary = {} # name -> Array[InputEvent]
-var _current_recording_name: String = ""
-var _current_recording: Array = []
-var _is_recording: bool = false
+## Editor-side commands for runtime game inspection.
+## Communicates with MCPGameInspector autoload via file-based IPC.
 
 
-func get_handlers() -> Dictionary:
+func get_commands() -> Dictionary:
 	return {
-		"execute_game_script": Callable(self, "_cmd_execute_game_script"),
-		"capture_frames": Callable(self, "_cmd_capture_frames"),
-		"monitor_properties": Callable(self, "_cmd_monitor_properties"),
-		"start_recording": Callable(self, "_cmd_start_recording"),
-		"stop_recording": Callable(self, "_cmd_stop_recording"),
-		"replay_recording": Callable(self, "_cmd_replay_recording"),
-		"find_nodes_by_script": Callable(self, "_cmd_find_nodes_by_script"),
-		"get_autoload": Callable(self, "_cmd_get_autoload"),
-		"batch_get_properties": Callable(self, "_cmd_batch_get_properties"),
-		"find_ui_elements": Callable(self, "_cmd_find_ui_elements"),
-		"click_button_by_text": Callable(self, "_cmd_click_button_by_text"),
-		"wait_for_node": Callable(self, "_cmd_wait_for_node"),
-		"find_nearby_nodes": Callable(self, "_cmd_find_nearby_nodes"),
-		"navigate_to": Callable(self, "_cmd_navigate_to"),
-		"move_to": Callable(self, "_cmd_move_to"),
+		"get_game_scene_tree": _get_game_scene_tree,
+		"get_game_node_properties": _get_game_node_properties,
+		"set_game_node_property": _set_game_node_property,
+		"capture_frames": _capture_frames,
+		"monitor_properties": _monitor_properties,
+		"execute_game_script": _execute_game_script,
+		"start_recording": _start_recording,
+		"stop_recording": _stop_recording,
+		"replay_recording": _replay_recording,
+		"find_nodes_by_script": _find_nodes_by_script,
+		"get_autoload": _get_autoload,
+		"batch_get_properties": _batch_get_properties,
+		"find_ui_elements": _find_ui_elements,
+		"click_button_by_text": _click_button_by_text,
+		"wait_for_node": _wait_for_node,
+		"find_nearby_nodes": _find_nearby_nodes,
+		"navigate_to": _navigate_to,
+		"move_to": _move_to,
+		"watch_signals": _watch_signals,
 	}
 
 
-func _cmd_execute_game_script(p: Dictionary) -> Dictionary:
-	var code := String(p.get("code", ""))
-	if code.is_empty():
-		return _error(-32602, "Missing code", "Pass GDScript code")
-	var node_path := String(p.get("nodePath", ""))
-	var target: Node = null
-	if not node_path.is_empty():
-		target = _find_node(node_path)
-	if target == null:
-		target = _edited_root()
-	if target == null:
-		return _error(-32010, "No target node", "Run a scene first")
-	# Build a temporary script
-	var script := GDScript.new()
-	script.source_code = "extends Node\nfunc _mcp_exec():\n"
-	for line in code.split("\n"):
-		script.source_code += "\t" + line + "\n"
-	script.source_code += "\treturn null\n"
-	var err := script.reload()
-	if err != OK:
-		return _error(-32052, "Script compile failed", "Check syntax")
-	var temp := Node.new()
-	temp.set_script(script)
-	target.add_child(temp)
-	var result = temp.call("_mcp_exec")
-	temp.queue_free()
-	return {"ok": true, "result": _safe_value(result)}
+func _get_game_scene_tree(params: Dictionary) -> Dictionary:
+	var max_depth: int = optional_int(params, "max_depth", -1)
+	var cmd_params := {"max_depth": max_depth}
+
+	var script_filter: String = optional_string(params, "script_filter")
+	if not script_filter.is_empty():
+		cmd_params["script_filter"] = script_filter
+
+	var type_filter: String = optional_string(params, "type_filter")
+	if not type_filter.is_empty():
+		cmd_params["type_filter"] = type_filter
+
+	var named_only: bool = optional_bool(params, "named_only", false)
+	if named_only:
+		cmd_params["named_only"] = true
+
+	return await _send_game_command("get_scene_tree", cmd_params)
 
 
-func _cmd_capture_frames(p: Dictionary) -> Dictionary:
-	var count := int(p.get("count", 3))
-	var interval := float(p.get("interval", 0.5))
-	var tree := _tree()
-	if tree == null:
-		return _error(-32010, "No scene tree", "Run a scene first")
-	var frames: Array[Dictionary] = []
-	for i in range(count):
-		if i > 0:
-			await tree.create_timer(interval).timeout
-		await tree.process_frame
-		var img := tree.root.get_viewport().get_texture().get_image()
-		if img:
-			var buf := img.save_png_to_buffer()
-			frames.append({"frame": i, "width": img.get_width(), "height": img.get_height(), "base64": Marshalls.raw_to_base64(buf)})
-	return {"ok": true, "count": frames.size(), "frames": frames}
+func _get_game_node_properties(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+
+	var cmd_params := {"node_path": result[0]}
+	# Optional property filter
+	if params.has("properties") and params["properties"] is Array:
+		cmd_params["properties"] = params["properties"]
+
+	return await _send_game_command("get_node_properties", cmd_params)
 
 
-func _cmd_monitor_properties(p: Dictionary) -> Dictionary:
-	var node := _find_node(String(p.get("path", "")))
-	if node == null:
-		return _error(-32602, "Node not found", "Pass valid path")
-	var props: Array = p.get("properties", [])
-	if props.is_empty():
-		return _error(-32602, "Missing properties", "Pass array of property names")
-	var duration := float(p.get("duration", 2.0))
-	var interval := float(p.get("interval", 0.5))
-	var tree := _tree()
-	var samples: Array[Dictionary] = []
-	var elapsed := 0.0
-	while elapsed < duration:
-		var sample := {"time": snapped(elapsed, 0.01)}
-		for prop in props:
-			var pname := String(prop)
-			sample[pname] = _safe_value(node.get(StringName(pname)))
-		samples.append(sample)
-		if tree:
-			await tree.create_timer(interval).timeout
-		elapsed += interval
-	return {"path": String(node.get_path()), "samples": samples}
+func _set_game_node_property(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+
+	var prop_result := require_string(params, "property")
+	if prop_result[1] != null:
+		return prop_result[1]
+
+	if not params.has("value"):
+		return error_invalid_params("Missing required parameter: value")
+
+	return await _send_game_command("set_node_property", {
+		"node_path": result[0],
+		"property": prop_result[0],
+		"value": params["value"],
+	})
 
 
-func _cmd_start_recording(p: Dictionary) -> Dictionary:
-	_current_recording_name = String(p.get("name", "default"))
-	_current_recording = []
-	_is_recording = true
-	return {"ok": true, "name": _current_recording_name}
+func _execute_game_script(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "code")
+	if result[1] != null:
+		return result[1]
+
+	return await _send_game_command("execute_script", {
+		"code": result[0],
+	}, 10.0)
 
 
-func _cmd_stop_recording(_p: Dictionary) -> Dictionary:
-	_is_recording = false
-	_recordings[_current_recording_name] = _current_recording.duplicate()
-	var count := _current_recording.size()
-	_current_recording = []
-	return {"ok": true, "name": _current_recording_name, "events": count}
+func _capture_frames(params: Dictionary) -> Dictionary:
+	var count: int = optional_int(params, "count", 5)
+	var frame_interval: int = optional_int(params, "frame_interval", 10)
+	var half_resolution: bool = optional_bool(params, "half_resolution", true)
+
+	# Dynamic timeout: allow enough time for frame capture
+	# At 60fps, 30 frames * 10 interval = 300 frames = 5 seconds + overhead
+	var estimated_seconds: float = (count * frame_interval) / 60.0 + 2.0
+	var timeout := minf(estimated_seconds, 25.0)
+
+	return await _send_game_command("capture_frames", {
+		"count": count,
+		"frame_interval": frame_interval,
+		"half_resolution": half_resolution,
+	}, timeout)
 
 
-func _cmd_replay_recording(p: Dictionary) -> Dictionary:
-	var name := String(p.get("name", "default"))
-	if not _recordings.has(name):
-		return _error(-32011, "Recording not found: %s" % name, "Use start_recording/stop_recording first")
-	var events: Array = _recordings[name]
-	var tree := _tree()
-	for ev in events:
-		if ev is InputEvent:
-			Input.parse_input_event(ev)
-			if tree:
-				await tree.create_timer(0.016).timeout
-	return {"ok": true, "name": name, "events": events.size()}
+func _monitor_properties(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+
+	if not params.has("properties") or not params["properties"] is Array:
+		return error_invalid_params("'properties' array is required")
+
+	var frame_count: int = optional_int(params, "frame_count", 60)
+	var frame_interval: int = optional_int(params, "frame_interval", 1)
+
+	# Dynamic timeout
+	var estimated_seconds: float = (frame_count * frame_interval) / 60.0 + 2.0
+	var timeout := minf(estimated_seconds, 25.0)
+
+	return await _send_game_command("monitor_properties", {
+		"node_path": result[0],
+		"properties": params["properties"],
+		"frame_count": frame_count,
+		"frame_interval": frame_interval,
+	}, timeout)
 
 
-func _cmd_find_nodes_by_script(p: Dictionary) -> Dictionary:
-	var script_path := String(p.get("scriptPath", ""))
-	if script_path.is_empty():
-		return _error(-32602, "Missing scriptPath", "Pass payload.scriptPath")
-	var root := _edited_root()
-	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var matches: Array[Dictionary] = []
-	_find_by_script_recursive(root, script_path, matches)
-	return {"scriptPath": script_path, "count": matches.size(), "nodes": matches}
+func _start_recording(params: Dictionary) -> Dictionary:
+	return await _send_game_command("start_recording", {})
 
 
-func _find_by_script_recursive(node: Node, script_path: String, output: Array[Dictionary]) -> void:
-	if node.get_script() is Script:
-		var s: Script = node.get_script()
-		if s.resource_path == script_path:
-			output.append({"name": node.name, "path": String(node.get_path()), "type": node.get_class()})
-	for child in node.get_children():
-		_find_by_script_recursive(child, script_path, output)
+func _stop_recording(params: Dictionary) -> Dictionary:
+	return await _send_game_command("stop_recording", {}, 5.0)
 
 
-func _cmd_get_autoload(p: Dictionary) -> Dictionary:
-	var name := String(p.get("name", ""))
-	if name.is_empty():
-		# List all autoloads
-		var autoloads: Array[Dictionary] = []
-		for prop in ProjectSettings.get_property_list():
-			var pname := String(prop.get("name", ""))
-			if pname.begins_with("autoload/"):
-				var al_name := pname.get_slice("/", 1)
-				autoloads.append({"name": al_name, "path": String(ProjectSettings.get_setting(pname))})
-		return {"count": autoloads.size(), "autoloads": autoloads}
-	var setting := "autoload/%s" % name
-	if not ProjectSettings.has_setting(setting):
-		return _error(-32011, "Autoload not found: %s" % name, "Check project autoloads")
-	return {"name": name, "path": String(ProjectSettings.get_setting(setting))}
+func _replay_recording(params: Dictionary) -> Dictionary:
+	if not params.has("events") or not params["events"] is Array:
+		return error_invalid_params("'events' array is required")
+	var speed: float = float(params.get("speed", 1.0))
+
+	# Calculate timeout based on event duration
+	var max_time_ms: int = 0
+	for event_data: Dictionary in params["events"]:
+		var t: int = int(event_data.get("time_ms", 0))
+		if t > max_time_ms:
+			max_time_ms = t
+	var timeout := (max_time_ms / 1000.0 / speed) + 5.0
+
+	return await _send_game_command("replay_recording", {
+		"events": params["events"],
+		"speed": speed,
+	}, minf(timeout, 120.0))
 
 
-func _cmd_batch_get_properties(p: Dictionary) -> Dictionary:
-	var queries: Array = p.get("queries", [])
-	if queries.is_empty():
-		return _error(-32602, "Missing queries", "Pass [{path, properties: []}]")
-	var results: Array[Dictionary] = []
-	for q in queries:
-		if typeof(q) != TYPE_DICTIONARY:
-			continue
-		var node := _find_node(String(q.get("path", "")))
-		if node == null:
-			results.append({"path": String(q.get("path", "")), "error": "Node not found"})
-			continue
-		var props: Array = q.get("properties", [])
-		var values := {}
-		for prop in props:
-			values[String(prop)] = _safe_value(node.get(StringName(String(prop))))
-		results.append({"path": String(node.get_path()), "values": values})
-	return {"count": results.size(), "results": results}
+func _find_nodes_by_script(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "script")
+	if result[1] != null:
+		return result[1]
+
+	var cmd_params := {"script": result[0]}
+	if params.has("properties") and params["properties"] is Array:
+		cmd_params["properties"] = params["properties"]
+
+	return await _send_game_command("find_nodes_by_script", cmd_params)
 
 
-func _cmd_find_ui_elements(p: Dictionary) -> Dictionary:
-	var root := _edited_root()
-	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var ui_types := ["Button", "Label", "TextEdit", "LineEdit", "CheckBox", "CheckButton", "OptionButton", "SpinBox", "HSlider", "VSlider", "ProgressBar", "TextureRect", "Panel", "TabContainer", "ItemList", "Tree"]
-	var elements: Array[Dictionary] = []
-	_find_ui_recursive(root, ui_types, elements)
-	return {"count": elements.size(), "elements": elements}
+func _get_autoload(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "name")
+	if result[1] != null:
+		return result[1]
+
+	var cmd_params := {"name": result[0]}
+	if params.has("properties") and params["properties"] is Array:
+		cmd_params["properties"] = params["properties"]
+
+	return await _send_game_command("get_autoload", cmd_params)
 
 
-func _find_ui_recursive(node: Node, types: Array, output: Array[Dictionary]) -> void:
-	for t in types:
-		if node.is_class(t):
-			var info := {"name": node.name, "path": String(node.get_path()), "type": node.get_class()}
-			if node is BaseButton and node.has_method("get_text"):
-				info["text"] = node.text
-			elif node is Label:
-				info["text"] = (node as Label).text
-			elif node is LineEdit:
-				info["text"] = (node as LineEdit).text
-			output.append(info)
+func _batch_get_properties(params: Dictionary) -> Dictionary:
+	if not params.has("nodes") or not params["nodes"] is Array:
+		return error_invalid_params("'nodes' array is required")
+
+	return await _send_game_command("batch_get_properties", {
+		"nodes": params["nodes"],
+	})
+
+
+func _find_ui_elements(params: Dictionary) -> Dictionary:
+	var cmd_params := {}
+	var type_filter: String = optional_string(params, "type_filter")
+	if not type_filter.is_empty():
+		cmd_params["type_filter"] = type_filter
+	return await _send_game_command("find_ui_elements", cmd_params)
+
+
+func _click_button_by_text(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "text")
+	if result[1] != null:
+		return result[1]
+
+	var cmd_params := {"text": result[0]}
+	var partial: bool = optional_bool(params, "partial", true)
+	cmd_params["partial"] = partial
+
+	return await _send_game_command("click_button_by_text", cmd_params)
+
+
+func _wait_for_node(params: Dictionary) -> Dictionary:
+	var result := require_string(params, "node_path")
+	if result[1] != null:
+		return result[1]
+
+	var timeout: float = float(params.get("timeout", 5.0))
+	var poll_frames: int = optional_int(params, "poll_frames", 5)
+
+	return await _send_game_command("wait_for_node", {
+		"node_path": result[0],
+		"timeout": timeout,
+		"poll_frames": poll_frames,
+	}, timeout + 2.0)
+
+
+func _find_nearby_nodes(params: Dictionary) -> Dictionary:
+	if not params.has("position"):
+		return error_invalid_params("Missing required parameter: position")
+
+	var cmd_params: Dictionary = {"position": params["position"]}
+	if params.has("radius"):
+		cmd_params["radius"] = float(params["radius"])
+	var type_filter: String = optional_string(params, "type_filter")
+	if not type_filter.is_empty():
+		cmd_params["type_filter"] = type_filter
+	var group_filter: String = optional_string(params, "group_filter")
+	if not group_filter.is_empty():
+		cmd_params["group_filter"] = group_filter
+	if params.has("max_results"):
+		cmd_params["max_results"] = int(params["max_results"])
+
+	return await _send_game_command("find_nearby_nodes", cmd_params)
+
+
+func _navigate_to(params: Dictionary) -> Dictionary:
+	if not params.has("target"):
+		return error_invalid_params("Missing required parameter: target")
+
+	var cmd_params: Dictionary = {"target": params["target"]}
+	var player_path: String = optional_string(params, "player_path")
+	if not player_path.is_empty():
+		cmd_params["player_path"] = player_path
+	var camera_path: String = optional_string(params, "camera_path")
+	if not camera_path.is_empty():
+		cmd_params["camera_path"] = camera_path
+	if params.has("move_speed"):
+		cmd_params["move_speed"] = float(params["move_speed"])
+
+	return await _send_game_command("navigate_to", cmd_params)
+
+
+func _move_to(params: Dictionary) -> Dictionary:
+	if not params.has("target"):
+		return error_invalid_params("Missing required parameter: target")
+
+	var cmd_params: Dictionary = {"target": params["target"]}
+	var player_path: String = optional_string(params, "player_path")
+	if not player_path.is_empty():
+		cmd_params["player_path"] = player_path
+	var camera_path: String = optional_string(params, "camera_path")
+	if not camera_path.is_empty():
+		cmd_params["camera_path"] = camera_path
+	if params.has("arrival_radius"):
+		cmd_params["arrival_radius"] = float(params["arrival_radius"])
+	if params.has("timeout"):
+		cmd_params["timeout"] = float(params["timeout"])
+	if params.has("run"):
+		cmd_params["run"] = bool(params["run"])
+	if params.has("look_at_target"):
+		cmd_params["look_at_target"] = bool(params["look_at_target"])
+
+	# Dynamic timeout: game-side timeout + overhead for IPC polling
+	var game_timeout: float = float(params.get("timeout", 15.0))
+	var ipc_timeout: float = game_timeout + 5.0
+
+	return await _send_game_command("move_to", cmd_params, ipc_timeout)
+
+
+func _watch_signals(params: Dictionary) -> Dictionary:
+	if not params.has("node_paths") or not params["node_paths"] is Array:
+		return error_invalid_params("Missing required parameter: node_paths (Array)")
+
+	var cmd_params: Dictionary = {"node_paths": params["node_paths"]}
+	if params.has("signal_filter") and params["signal_filter"] is Array:
+		cmd_params["signal_filter"] = params["signal_filter"]
+	var duration_ms: int = optional_int(params, "duration_ms", 5000)
+	cmd_params["duration_ms"] = duration_ms
+
+	# Dynamic timeout: duration + overhead
+	var timeout_sec: float = (duration_ms / 1000.0) + 5.0
+
+	return await _send_game_command("watch_signals", cmd_params, timeout_sec)
+
+
+# ── IPC Helper ────────────────────────────────────────────────────────────────
+
+func _send_game_command(command: String, params: Dictionary, timeout_sec: float = 5.0) -> Dictionary:
+	var ei := get_editor()
+	if not ei.is_playing_scene():
+		return error(-32000, "No scene is currently playing", {"suggestion": "Use play_scene first"})
+
+	var user_dir := get_game_user_dir()
+	var request_path := user_dir + "/mcp_game_request"
+	var response_path := user_dir + "/mcp_game_response"
+
+	# Clean stale response
+	if FileAccess.file_exists(response_path):
+		DirAccess.remove_absolute(response_path)
+
+	# Write request
+	var request_data := JSON.stringify({"command": command, "params": params})
+	var req := FileAccess.open(request_path, FileAccess.WRITE)
+	if req == null:
+		return error_internal("Could not create game request file")
+	req.store_string(request_data)
+	req.close()
+
+	# Poll for response
+	var attempts := int(timeout_sec / 0.1)
+	while attempts > 0:
+		await get_tree().create_timer(0.1).timeout
+		if FileAccess.file_exists(response_path):
 			break
-	for child in node.get_children():
-		_find_ui_recursive(child, types, output)
+		# Check if game is still running
+		if not ei.is_playing_scene():
+			if FileAccess.file_exists(request_path):
+				DirAccess.remove_absolute(request_path)
+			return error(-32000, "Game stopped during command execution")
+		attempts -= 1
+
+	if not FileAccess.file_exists(response_path):
+		# Try to auto-resume the debugger (runtime error may have paused the game)
+		if ei.is_playing_scene():
+			_try_debugger_continue()
+			# Give the game a chance to recover and write a response
+			for _retry in 20:
+				await get_tree().create_timer(0.1).timeout
+				if FileAccess.file_exists(response_path):
+					break
+
+	if not FileAccess.file_exists(response_path):
+		if FileAccess.file_exists(request_path):
+			DirAccess.remove_absolute(request_path)
+		return error(-32000, "Game command timed out after %.1fs" % timeout_sec, {
+			"suggestion": "Ensure the game is running and MCPGameInspector autoload is active",
+		})
+
+	# Read response
+	var file := FileAccess.open(response_path, FileAccess.READ)
+	if file == null:
+		return error_internal("Could not read game response file")
+	var text := file.get_as_text()
+	file.close()
+	DirAccess.remove_absolute(response_path)
+
+	var parsed = JSON.parse_string(text)
+	if parsed == null or not parsed is Dictionary:
+		return error_internal("Invalid response JSON from game")
+
+	if parsed.has("error"):
+		return error(-32000, str(parsed["error"]))
+
+	return success(parsed)
 
 
-func _cmd_click_button_by_text(p: Dictionary) -> Dictionary:
-	var text := String(p.get("text", ""))
-	if text.is_empty():
-		return _error(-32602, "Missing text", "Pass button text to click")
-	var root := _edited_root()
-	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var btn := _find_button_by_text(root, text)
-	if btn == null:
-		return _error(-32011, "Button not found: %s" % text, "Check button text")
-	btn.emit_signal("pressed")
-	return {"ok": true, "path": String(btn.get_path()), "text": text}
-
-
-func _find_button_by_text(node: Node, text: String) -> BaseButton:
-	if node is BaseButton and node.has_method("get_text"):
-		if node.text == text or node.text.contains(text):
-			return node as BaseButton
-	for child in node.get_children():
-		var result := _find_button_by_text(child, text)
-		if result:
-			return result
-	return null
-
-
-func _cmd_wait_for_node(p: Dictionary) -> Dictionary:
-	var path := String(p.get("path", ""))
-	if path.is_empty():
-		return _error(-32602, "Missing path", "Pass node path to wait for")
-	var timeout := float(p.get("timeout", 5.0))
-	var interval := float(p.get("interval", 0.25))
-	var tree := _tree()
-	var elapsed := 0.0
-	while elapsed < timeout:
-		var node := _find_node(path)
-		if node != null:
-			return {"ok": true, "found": true, "path": String(node.get_path()), "elapsed": snapped(elapsed, 0.01)}
-		if tree:
-			await tree.create_timer(interval).timeout
-		elapsed += interval
-	return {"ok": true, "found": false, "timeout": timeout}
-
-
-func _cmd_find_nearby_nodes(p: Dictionary) -> Dictionary:
-	var pos_x := float(p.get("x", 0))
-	var pos_y := float(p.get("y", 0))
-	var radius := float(p.get("radius", 200))
-	var pos := Vector2(pos_x, pos_y)
-	var root := _edited_root()
-	if root == null:
-		return _error(-32010, "No scene", "Open a scene")
-	var nearby: Array[Dictionary] = []
-	_find_nearby_recursive(root, pos, radius, nearby)
-	return {"position": [pos_x, pos_y], "radius": radius, "count": nearby.size(), "nodes": nearby}
-
-
-func _find_nearby_recursive(node: Node, pos: Vector2, radius: float, output: Array[Dictionary]) -> void:
-	if node is Node2D:
-		var dist := (node as Node2D).global_position.distance_to(pos)
-		if dist <= radius:
-			output.append({"name": node.name, "path": String(node.get_path()), "type": node.get_class(), "distance": snapped(dist, 0.1)})
-	for child in node.get_children():
-		_find_nearby_recursive(child, pos, radius, output)
-
-
-func _cmd_navigate_to(p: Dictionary) -> Dictionary:
-	var node := _find_node(String(p.get("path", "")))
-	if node == null:
-		return _error(-32602, "Node not found", "Pass valid path")
-	var target_x := float(p.get("x", 0))
-	var target_y := float(p.get("y", 0))
-	if node is Node2D:
-		(node as Node2D).global_position = Vector2(target_x, target_y)
-	elif node is Node3D:
-		var z := float(p.get("z", 0))
-		(node as Node3D).global_position = Vector3(target_x, target_y, z)
-	return {"ok": true, "path": String(node.get_path()), "position": [target_x, target_y]}
-
-
-func _cmd_move_to(p: Dictionary) -> Dictionary:
-	return _cmd_navigate_to(p)
+## Press the debugger "Continue" button to resume a paused game process.
+func _try_debugger_continue() -> void:
+	var base := EditorInterface.get_base_control()
+	if base == null:
+		return
+	var queue: Array[Node] = [base]
+	while not queue.is_empty():
+		var node := queue.pop_front()
+		if node.get_class() == "ScriptEditorDebugger":
+			var inner: Array[Node] = [node]
+			while not inner.is_empty():
+				var n := inner.pop_front()
+				if n is Button and n.tooltip_text == "Continue":
+					n.emit_signal("pressed")
+					push_warning("[MCP] Auto-resumed debugger after runtime error")
+					return
+				for c in n.get_children():
+					inner.append(c)
+			return
+		for child in node.get_children():
+			queue.append(child)

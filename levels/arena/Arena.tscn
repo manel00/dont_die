@@ -45,6 +45,14 @@ size = Vector3(250, 2, 250)
 agent_height = 0.95
 agent_radius = 0.35
 
+[sub_resource type="StandardMaterial3D" id="FloorMaterial"]
+albedo_color = Color(0.15, 0.15, 0.18, 1)
+metallic = 0.2
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="FloorMesh"]
+size = Vector3(250, 2, 250)
+
 [node name="Arena" type="Node3D" unique_id=1663212986]
 script = ExtResource("1_arena")
 
@@ -61,6 +69,10 @@ directional_shadow_blend_splits = true
 
 [node name="FloorStaticBody" type="StaticBody3D" parent="." unique_id=989270217]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FloorStaticBody"]
+mesh = SubResource("FloorMesh")
+surface_material_override/0 = SubResource("FloorMaterial")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FloorStaticBody" unique_id=854592146]
 shape = SubResource("BoxShape3D_floor")
