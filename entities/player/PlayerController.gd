@@ -307,8 +307,11 @@ func _update_trajectory_preview() -> void:
 	var charge_pct: float = _grenade_charge / GRENADE_MAX_CHARGE
 	var throw_force: float = lerp(GRENADE_MIN_THROW_FORCE, GRENADE_MAX_THROW_FORCE, charge_pct)
 	
-	var start_pos: Vector3 = global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5
-	var velocity: Vector3 = last_look_dir * throw_force
+	# Usar la dirección real del modelo visual para la trayectoria
+	var throw_dir := _get_look_direction()
+	
+	var start_pos: Vector3 = global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5
+	var velocity: Vector3 = throw_dir * throw_force
 	velocity.y = 8.0 * (0.5 + charge_pct * 0.5)  # Higher arc with more charge
 	
 	var gravity := Vector3(0, -20.0, 0)
@@ -334,29 +337,39 @@ func _clear_trajectory_preview() -> void:
 			point.queue_free()
 	_grenade_trajectory_points.clear()
 
+func _get_look_direction() -> Vector3:
+	# Usar last_look_dir que es la dirección basada en el input del jugador
+	if last_look_dir.length() > 0.1:
+		return last_look_dir.normalized()
+	return Vector3.FORWARD
+
 func _throw_grenade() -> void:
 	_is_charging_grenade = false
 	
 	var charge_pct: float = clamp(_grenade_charge / GRENADE_MAX_CHARGE, 0.0, 1.0)
 	var throw_force: float = lerp(GRENADE_MIN_THROW_FORCE, GRENADE_MAX_THROW_FORCE, charge_pct)
 	
-	var throw_velocity: Vector3 = last_look_dir * throw_force
+	# Usar la dirección real del modelo visual para lanzar
+	var throw_dir := _get_look_direction()
+	
+	var throw_velocity: Vector3 = throw_dir * throw_force
 	throw_velocity.y = 8.0 * (0.5 + charge_pct * 0.5)
 	
 	# Spawn grenade
 	if multiplayer.is_server():
-		rpc_spawn_grenade.rpc(global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5, throw_velocity)
+		rpc_spawn_grenade.rpc(global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5, throw_velocity)
 	else:
-		rpc_id(1, "rpc_request_grenade", global_position + Vector3(0, 1.5, 0) + last_look_dir * 0.5, throw_velocity)
+		rpc_id(1, "rpc_request_grenade", global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5, throw_velocity)
 	
 	# Clear trajectory
 	_clear_trajectory_preview()
 	
-	# Animation
+	# Animation - guardar valor inicial para evitar deformación acumulativa
 	if visual_model:
+		var initial_rot_x := visual_model.rotation_degrees.x
 		var tw = create_tween().set_parallel(true)
-		tw.tween_property(visual_model, "rotation_degrees:x", visual_model.rotation_degrees.x + 45, 0.1)
-		tw.chain().tween_property(visual_model, "rotation_degrees:x", visual_model.rotation_degrees.x, 0.2)
+		tw.tween_property(visual_model, "rotation_degrees:x", initial_rot_x + 45, 0.1)
+		tw.chain().tween_property(visual_model, "rotation_degrees:x", initial_rot_x, 0.2)
 	
 	_play_shoot_sound()
 

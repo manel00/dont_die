@@ -22,3 +22,7 @@ Esta es una guía de reglas para evitar errores comunes heredados de cambios est
 
 ## 5. Respawn y Persistencia del Jugador
 - Cuando el jugador muere, es preferible realizar un `teleport` y resetear la vida en lugar de hacer `queue_free()` si no hay un sistema de Game Over robusto, para evitar romper referencias en el HUD o en los Bots aliados.
+
+## 6. Sistema de Armas Styloo
+- **NO se puede recoger un arma del suelo si ya tienes una equipada.** Primero debes soltar la tuya (presiona Q o la tecla de drop) para poder recoger otra del suelo.
+- El temporizador `_despawn_timer` en `StylooWeaponPickup.gd` debe actualizarse en `_process()` para permitir recoger armas droppeadas después de 0.5 segundos.

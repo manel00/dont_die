@@ -133,11 +133,11 @@ func _ready() -> void:
 
 	add_to_group("styloo_pickups")
 
-	# Configurar collision — capa 0, detecta capa 1 (jugadores)
-	collision_layer = 0
+	# Configurar collision — capa 1 para detectar jugadores en esa capa
+	collision_layer = 1
 	collision_mask = 1
 	monitoring = true
-	monitorable = false
+	monitorable = true
 
 	# Añadir collision shape
 	var col := CollisionShape3D.new()
@@ -235,6 +235,10 @@ func _make_fallback_mesh() -> MeshInstance3D:
 	mat.metallic = 0.7
 	mesh.material_override = mat
 	return mesh
+
+func _process(delta: float) -> void:
+	if _is_dropped:
+		_despawn_timer += delta
 
 func _on_body_entered(body: Node3D) -> void:
 	if not multiplayer.is_server():
