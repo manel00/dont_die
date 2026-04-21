@@ -263,8 +263,12 @@ func _handle_abilities() -> void:
 		_aoe_explosion()
 
 	# Ability 3: Weapon (3 or Numpad 3 if has_weapon)
-	if (Input.is_action_just_pressed("weapon_3") or _check_physical_key.call(KEY_KP_3) or _check_physical_key.call(KEY_3)) and has_weapon:
-		_fire_weapon()
+	if (Input.is_action_just_pressed("weapon_3") or _check_physical_key.call(KEY_KP_3) or _check_physical_key.call(KEY_3)):
+		if has_weapon:
+			print("DEBUG: Firing weapon_3 (", _current_styloo_weapon, ")")
+			_fire_weapon()
+		else:
+			print("DEBUG: Pressed weapon_3 but has_weapon is FALSE")
 	
 	# Ability 4: Grenade (4 or Numpad 4) - Hold to charge, release to throw
 	_handle_grenade_input()
@@ -301,12 +305,11 @@ func _update_grenade_charge() -> void:
 	_grenade_charge = min(_grenade_charge, GRENADE_MAX_CHARGE)
 
 func _get_look_direction() -> Vector3:
-	# Usar la rotación del visual_model (donde mira el personaje)
+	# Usar la orientación real del modelo visual para disparar
 	if visual_model:
-		var rot_y := visual_model.rotation.y
-		return Vector3(sin(rot_y), 0, cos(rot_y)).normalized()
+		# Si disparaba por detrás, es que el basis.z del modelo apunta hacia adelante (orientación +Z)
+		return visual_model.global_transform.basis.z.normalized()
 	
-	# Fallback a last_look_dir
 	if last_look_dir.length() > 0.1:
 		return last_look_dir.normalized()
 	return Vector3.FORWARD
@@ -487,15 +490,14 @@ func _fire_weapon() -> void:
 
 func _fire_ranged_projectile() -> void:
 	"""Disparar proyectil ranged (shurikens, kunai, hachas)."""
-	# Usar la dirección real hacia donde mira el personaje (visual_model)
+	# Usar la dirección real hacia donde mira el personaje, pero forzando horizontal como los bots
 	var shoot_dir := _get_look_direction()
+	shoot_dir.y = 0 # FORZAR VUELO PARALELO AL SUELO
+	shoot_dir = shoot_dir.normalized()
 	
-	# CRITICAL FIX: Posición de spawn desde el arma visual
-	var spawn_pos: Vector3
-	if _weapon_visual:
-		spawn_pos = _weapon_visual.global_position + shoot_dir * 0.5
-	else:
-		spawn_pos = global_position + Vector3(0, 1.0, 0) + shoot_dir * 0.8
+	# CRITICAL FIX: Posición de spawn segura (a la altura del pecho, ~1.1m sobre el suelo)
+	# Evitamos usar _weapon_visual.global_position que puede variar por animaciones
+	var spawn_pos := global_position + Vector3(0, 1.1, 0) + shoot_dir * 0.8
 	
 	if multiplayer.is_server():
 		rpc_spawn_styloo_projectile.rpc(spawn_pos, shoot_dir, _current_styloo_weapon, _current_weapon_data)
@@ -579,6 +581,10 @@ func rpc_spawn_styloo_projectile(pos: Vector3, dir: Vector3, weapon_type: String
 			proj.global_position = pos
 			proj.direction = dir.normalized()
 			proj.weapon_type = weapon_type
+			
+			# Orientar el proyectil hacia su dirección de vuelo
+			if dir.length() > 0.01:
+				proj.look_at(pos + dir.normalized(), Vector3.UP)
 			proj.damage = weapon_data.get("damage", 25)
 
 			# Configurar comportamiento según tipo

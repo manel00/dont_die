@@ -160,15 +160,7 @@ func _setup_health_bar() -> void:
 	var y_offset := 4.2 if is_miniboss else 3.5
 	var pixel_size := 0.004 if is_miniboss else 0.0035
 	
-	# Barra de fondo = vida mÃ¡xima (negro)
-	_health_bar_bg = Sprite3D.new()
-	_health_bar_bg.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_health_bar_bg.pixel_size = pixel_size
-	_health_bar_bg.texture = _create_bar_texture(Color(0.1, 0.1, 0.1, 1.0))
-	_health_bar_bg.scale = Vector3(bar_width, bar_height, 1)
-	_health_bar_bg.position = Vector3(0, y_offset, 0)
-	_health_bar_bg.render_priority = 0
-	add_child(_health_bar_bg)
+	# Barra de fondo eliminada por petición del usuario para más limpieza visual
 	
 	# Barra de vida actual - creamos textura BLANCA para que el modulate funcione
 	_health_bar_fill = Sprite3D.new()
@@ -207,13 +199,10 @@ func _update_health_bar() -> void:
 	# Actualizamos offset X moviÃ©ndolo a la izquierda
 	_health_bar_fill.position.x = -shift
 	
-	# Colores según vida baja (amarillo/rojo) - mantener color base si > 50%
+	# Colores según vida (unificado a VERDE por petición del usuario)
 	var target_color: Color
 	if pct > 0.5:
-		if is_miniboss:
-			target_color = Color(0.4, 0.9, 1.0)  # Azul celeste brillante
-		else:
-			target_color = Color(0.3, 1.0, 0.3)  # Verde brillante
+		target_color = Color(0.3, 1.0, 0.3)  # Verde brillante (igual que el jugador)
 	elif pct > 0.25:
 		target_color = Color(1.0, 1.0, 0.3)  # Amarillo
 	else:
@@ -222,14 +211,10 @@ func _update_health_bar() -> void:
 	_health_bar_fill.modulate = target_color
 	
 	# Ocultar barra si estÃ¡ muerto (vida <= 0)
-	if _health_bar_bg:
-		_health_bar_bg.visible = current_health > 0
 	_health_bar_fill.visible = current_health > 0
 	
 	# Forzar ocultaciÃ³n si la vida es <= 0
 	if current_health <= 0:
-		if _health_bar_bg:
-			_health_bar_bg.visible = false
 		_health_bar_fill.visible = false
 
 func _fix_zero_scales() -> void:
@@ -250,21 +235,16 @@ func _fix_health_bar_for_mecha() -> void:
 		return
 	
 	# Elevación estratégica: los mechas son muy altos y anchos
-	var mecha_y_offset := 6.5
-	_health_bar_bg.position.y = mecha_y_offset
+	var mecha_y_offset := 8.5
 	_health_bar_fill.position.y = mecha_y_offset
 	
 	# IMPORTANTE: En Godot 4, Sprite3D tiene propiedades directas para esto
 	# Evitamos usar material_override que rompe la textura interna del Sprite3D
-	_health_bar_bg.no_depth_test = true
-	_health_bar_bg.render_priority = 100
-	
 	_health_bar_fill.no_depth_test = true
 	_health_bar_fill.render_priority = 101
 	
 	# Hacer la barra de los mechas un 50% más grande que la de los minions
 	var mecha_bar_scale_mult := 1.5
-	_health_bar_bg.scale *= mecha_bar_scale_mult
 	_health_bar_fill.scale *= mecha_bar_scale_mult
 	
 	# Forzar actualización inicial
@@ -711,12 +691,15 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 		
 	if mecha_node:
 		visual.add_child(mecha_node)
-		# Aplicar el material adecuado
+		# Aplicar el material adecuado a TODAS las superficies para evitar errores de material null
 		if mecha_node is MeshInstance3D:
-			mecha_node.set_surface_override_material(0, _mecha_materials[index])
+			for i in range(mecha_node.mesh.get_surface_count()):
+				mecha_node.set_surface_override_material(i, _mecha_materials[index])
 		else:
 			for mi in mecha_node.find_children("*", "MeshInstance3D", true, false):
-				mi.set_surface_override_material(0, _mecha_materials[index])
+				if mi.mesh:
+					for i in range(mi.mesh.get_surface_count()):
+						mi.set_surface_override_material(i, _mecha_materials[index])
 				
 		# Ajustar escala a su tamaño natural de Godot (1.0)
 		mecha_node.scale = Vector3(1.0, 1.0, 1.0)

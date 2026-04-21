@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 
 ## AudioManager (Autoload)
 ## Sistema de audio con SFX sintÃ©ticos procedurales para disparo, impacto, muerte y UI.
@@ -68,8 +68,9 @@ func _play_synth_sfx(frequency: float, duration: float, volume_db: float, bus: S
 	player.volume_db = volume_db * 10.0 - 10.0
 	add_child(player)
 
-	# FIX: Fill buffer BEFORE playing to avoid first-frame silence/garbage
-	await get_tree().process_frame
+	# Now start playback before requesting playback handle (Required in Godot 4)
+	player.play()
+	
 	var pb := player.get_stream_playback() as AudioStreamGeneratorPlayback
 	if pb:
 		var samples_needed: int = int(gen.mix_rate * duration)
@@ -79,9 +80,6 @@ func _play_synth_sfx(frequency: float, duration: float, volume_db: float, bus: S
 			var sample: float = sin(t * frequency * TAU) * exp(-t * 8.0) * volume_db
 			pb.push_frame(Vector2(sample, sample))
 			t += dt
-
-	# Now start playback after buffer is filled
-	player.play()
 
 	# Auto-limpiar
 	var cleanup_timer := get_tree().create_timer(duration + 0.1)

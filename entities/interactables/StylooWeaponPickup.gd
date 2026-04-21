@@ -150,25 +150,6 @@ func _ready() -> void:
 	col.position = Vector3(0, 0.3, 0)  # Misma altura que WeaponVisual
 	add_child(col)
 	
-	# Debug visual - esfera sutil que marca la zona de recogida
-	var debug_mesh := MeshInstance3D.new()
-	debug_mesh.name = "DebugCollisionArea"
-	var sphere_mesh := SphereMesh.new()
-	sphere_mesh.radius = 2.5
-	sphere_mesh.height = 5.0
-	sphere_mesh.radial_segments = 24
-	sphere_mesh.rings = 12
-	debug_mesh.mesh = sphere_mesh
-	debug_mesh.position = Vector3(0, 0.3, 0) # MISMO LUGAR que la futura arma visual
-	var debug_mat := StandardMaterial3D.new()
-	debug_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	debug_mat.albedo_color = Color(0, 1, 0, 0.1) # 80%+ transparente
-	debug_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	debug_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	debug_mat.no_depth_test = true # Siempre visible para saber dónde está el pickup
-	debug_mesh.material_override = debug_mat
-	add_child(debug_mesh)
-
 	# Conectar señal de pickup
 	body_entered.connect(_on_body_entered)
 

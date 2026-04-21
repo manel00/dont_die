@@ -9,7 +9,11 @@ extends Area3D
 @export var speed: float = 30.0
 @export var damage: int = 25
 @export var life_time: float = 3.0
-@export var weapon_type: String = "shuriken1"  # shuriken1-4, kunai, doubleAxe, simpleAxe
+@export var weapon_type: String = "shuriken1":
+	set(v):
+		weapon_type = v
+		if is_node_ready():
+			_setup_weapon_behavior()
 @export var hit_group: String = "enemies"
 
 var direction: Vector3 = Vector3.FORWARD
@@ -19,12 +23,11 @@ var _is_axe: bool = false
 var _spin_speed: float = 0.0
 var _damaged_enemies: Dictionary = {}  # Track enemigos ya daÃ±ados (para evitar daÃ±o mÃºltiple)
 const MAX_DAMAGED_TRACKED: int = 20  # BUG FIX: Limit dictionary size to prevent memory leak
+var _is_setup: bool = false # Evitar doble setup
 
 func _ready() -> void:
-	body_entered.connect(_on_body_entered)
-	
-	# Configurar segÃºn tipo de arma
 	_setup_weapon_behavior()
+	body_entered.connect(_on_body_entered)
 	
 	# Auto-destruir despuÃ©s de tiempo de vida
 	var timer = get_tree().create_timer(life_time)
@@ -34,6 +37,13 @@ func _ready() -> void:
 	_spawn_muzzle_flash()
 
 func _setup_weapon_behavior() -> void:
+	if _is_setup and Engine.is_editor_hint(): return
+	_is_setup = true
+	
+	# Limpiar visuales previos si existen (caso de cambio en runtime)
+	var prev = get_node_or_null("ModelContainer")
+	if prev: prev.queue_free()
+	
 	match weapon_type:
 		"shuriken1", "shuriken2", "shuriken3", "shuriken4":
 			# Shurikens: RÃ¡pido, rebota, daÃ±o medio
