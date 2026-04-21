@@ -46,15 +46,15 @@ func _update_animation() -> void:
 		return
 	match current_state:
 		State.IDLE:
-			if not _anim_player.current_animation == ANIM_IDLE:
+			if not (_anim_player.current_animation == ANIM_IDLE):
 				if _anim_player.has_animation(ANIM_IDLE):
 					_anim_player.play(ANIM_IDLE)
 		State.CHASE:
-			if not _anim_player.current_animation == ANIM_WALK:
+			if not (_anim_player.current_animation == ANIM_WALK):
 				if _anim_player.has_animation(ANIM_WALK):
 					_anim_player.play(ANIM_WALK)
 		State.ATTACK:
-			if not _anim_player.current_animation == ANIM_ATTACK:
+			if not (_anim_player.current_animation == ANIM_ATTACK):
 				if _anim_player.has_animation(ANIM_ATTACK):
 					_anim_player.play(ANIM_ATTACK)
 		State.DEAD:

@@ -1,4 +1,4 @@
-﻿class_name MagicProjectile
+class_name MagicProjectile
 extends Area3D
 
 @export var speed: float = 30.0
@@ -15,6 +15,66 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	var lifetime_timer := get_tree().create_timer(3.0)
 	lifetime_timer.timeout.connect(queue_free)
+	
+	# Cambiar color a ROJO
+	_setup_visuals()
+
+func _setup_visuals() -> void:
+	# Cambiar color de la esfera principal
+	var sphere = get_node_or_null("CSGSphere3D")
+	if sphere:
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(1, 0, 0) # Rojo puro
+		mat.emission_enabled = true
+		mat.emission = Color(2, 0, 0) # Brillo rojo intenso
+		sphere.material = mat
+	
+	# Añadir luz roja
+	var light = OmniLight3D.new()
+	light.light_color = Color(1, 0.1, 0)
+	light.light_energy = 2.0
+	light.omni_range = 3.0
+	add_child(light)
+
+	# Crear estela de partículas ROJAS
+	_create_red_trail()
+
+func _create_red_trail() -> void:
+	var trail = GPUParticles3D.new()
+	trail.amount = 30
+	trail.lifetime = 0.5
+	trail.local_coords = false
+	
+	var mat = ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.3
+	mat.gravity = Vector3(0, 1.0, 0) # Humo/fuego que sube un poco
+	mat.initial_velocity_min = 0.0
+	mat.initial_velocity_max = 1.0
+	mat.color = Color(1, 0.1, 0)
+	mat.scale_min = 0.05
+	mat.scale_max = 0.2
+	
+	# Curva de escala para que se desvanezcan
+	var scale_curve := CurveTexture.new()
+	var curve := Curve.new()
+	curve.add_point(Vector2(0, 1))
+	curve.add_point(Vector2(1, 0))
+	scale_curve.curve = curve
+	mat.scale_curve = scale_curve
+	
+	trail.process_material = mat
+	
+	var mesh = SphereMesh.new()
+	mesh.radius = 0.1
+	mesh.height = 0.2
+	var mesh_mat = StandardMaterial3D.new()
+	mesh_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mesh_mat.albedo_color = Color(1, 0.2, 0)
+	mesh.material = mesh_mat
+	
+	trail.draw_pass_1 = mesh
+	add_child(trail)
 
 func _physics_process(delta: float) -> void:
 	# FIX: Timer de gracia antes de activar colisiones
@@ -28,31 +88,33 @@ func _on_body_entered(body: Node3D) -> void:
 	if not (body is CharacterBody3D or (body is StaticBody3D and body.has_method("take_damage"))):
 		return
 	
-	# DaÃ±o en Ã¡rea a todos los targets del grupo correcto en radio
+	# Daño en área a todos los targets del grupo correcto en radio
 	var targets := get_tree().get_nodes_in_group(hit_group)
-	# print("DEBUG MagicProjectile: checking ", targets.size(), " targets in group '", hit_group, "'")
 	for t in targets:
 		if is_instance_valid(t) and t.global_position.distance_to(global_position) <= explosion_radius:
 			if t.has_method("take_damage"):
-				var dist = t.global_position.distance_to(global_position)
-				# print("DEBUG MagicProjectile: HIT target=", t.name, " dist=", dist, " damage=", impact_damage)
 				t.take_damage(int(impact_damage))
 				
-	# Efecto visual de explosiÃ³n
+	# Efecto visual de explosión ROJO
+	var scene := get_tree().current_scene
+	if not scene:
+		queue_free()
+		return
+	
 	var explosion := CSGSphere3D.new()
 	explosion.radius = explosion_radius
 	explosion.radial_segments = 32
 	explosion.rings = 16
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 0.5, 0, 0.6)
+	mat.albedo_color = Color(1, 0, 0, 0.6) # Rojo
 	mat.emission_enabled = true
-	mat.emission = Color(1, 0.2, 0)
+	mat.emission = Color(2, 0, 0)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	explosion.material = mat
-	get_tree().current_scene.add_child(explosion)
+	scene.add_child(explosion)
 	explosion.global_position = global_position
 	
-	var tw := get_tree().current_scene.create_tween()
+	var tw := scene.create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(mat, "albedo_color:a", 0.0, 0.5)
 	tw.tween_property(explosion, "scale", Vector3(1.3, 1.3, 1.3), 0.5)

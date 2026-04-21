@@ -12,14 +12,16 @@ const STYLOO_WEAPONS := {
 		"scale": Vector3(0.03, 0.03, 0.03),
 		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.3, "damage": 35, "range": 3.0,
-		"color": Color(0.7, 0.7, 0.8, 1.0)
+		"color": Color(0.7, 0.7, 0.8, 1.0),
+		"type": "ranged"
 	},
 	"coolknife": {
 		"file": "ASSETS.fbx_coolknife.fbx",
 		"scale": Vector3(0.03, 0.03, 0.03),
 		"rotation": Vector3(0, 90, 0),
 		"cooldown": 0.25, "damage": 30, "range": 2.5,
-		"color": Color(0.2, 0.8, 1.0, 1.0)
+		"color": Color(0.2, 0.8, 1.0, 1.0),
+		"type": "ranged"
 	},
 	"doubleAxe": {
 		"file": "ASSETS.fbx_doubleAxe.fbx",
@@ -148,22 +150,22 @@ func _ready() -> void:
 	col.position = Vector3(0, 0.3, 0)  # Misma altura que WeaponVisual
 	add_child(col)
 	
-	# Debug visual - esfera en MISMA POSICIÓN que el arma
+	# Debug visual - esfera sutil que marca la zona de recogida
 	var debug_mesh := MeshInstance3D.new()
 	debug_mesh.name = "DebugCollisionArea"
 	var sphere_mesh := SphereMesh.new()
 	sphere_mesh.radius = 2.5
 	sphere_mesh.height = 5.0
-	sphere_mesh.radial_segments = 16
-	sphere_mesh.rings = 8
+	sphere_mesh.radial_segments = 24
+	sphere_mesh.rings = 12
 	debug_mesh.mesh = sphere_mesh
-	debug_mesh.position = Vector3(0, 0.3, 0)  # Misma altura que el arma
+	debug_mesh.position = Vector3(0, 0.3, 0) # MISMO LUGAR que la futura arma visual
 	var debug_mat := StandardMaterial3D.new()
 	debug_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	debug_mat.albedo_color = Color(0, 1, 0, 0.3)  # Verde semi-transparente
+	debug_mat.albedo_color = Color(0, 1, 0, 0.1) # 80%+ transparente
 	debug_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	debug_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	debug_mat.no_depth_test = true  # Siempre visible
+	debug_mat.no_depth_test = true # Siempre visible para saber dónde está el pickup
 	debug_mesh.material_override = debug_mat
 	add_child(debug_mesh)
 
@@ -198,13 +200,22 @@ func _build_visual() -> void:
 			loaded_model = res.instantiate()
 
 	if loaded_model:
-		# Escala + rotación definidas por datos del arma
-		loaded_model.scale = _weapon_data.scale * 300.0
+		# Detectar si es objeto pequeño (shuriken, kunai, cuchillo, bayoneta, hacha) para escala aumentada
+		var is_small_weapon := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet" or weapon_type.contains("Axe") or weapon_type == "pickaxe"
+		var scale_multiplier := 900.0 if is_small_weapon else 300.0
+		
+		# IMPORTANTE: Aplicar escala y rotación ANTES de centrar
+		# De lo contrario, el offset original se magnifica erróneamente
+		loaded_model.scale = _weapon_data.scale * scale_multiplier
 		loaded_model.rotation_degrees = _weapon_data.rotation
-		# SIEMPRE en el origen del contenedor — evita órbita al rotar
-		loaded_model.position = Vector3.ZERO
 		_apply_texture(loaded_model)
+		
+		# Ahora centramos el modelo escalado y rotado relativo a su contenedor
+		_center_model(loaded_model)
+		
 		visual.add_child(loaded_model)
+		# Sincronizar posición visual exacta con la esfera de debug (0, 0.3, 0)
+		visual.position = Vector3(0, 0.3, 0)
 	else:
 		# Fallback geométrico si no hay .fbx disponible
 		visual.add_child(_make_fallback_mesh())
@@ -229,18 +240,19 @@ func _apply_texture(model: Node3D) -> void:
 	var tex: Texture2D = load(tex_path)
 	if not tex:
 		return
+		
+	# Crear un único material para compartir entre mallas
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.albedo_color = Color.WHITE
+	mat.metallic = 0.2
+	mat.roughness = 0.8  # Menos brillo para que se vea mejor la textura
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	
 	for mesh in _find_meshes(model):
-		# Limpiar materiales embebidos primero
-		mesh.material_override = null
-		mesh.material_overlay = null
-		# Crear material fresco con textura
-		var mat := StandardMaterial3D.new()
-		mat.albedo_texture = tex
-		mat.albedo_color = Color.WHITE
-		mat.metallic = 0.3
-		mat.roughness = 0.5
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		mesh.material_override = mat
+		# Usar surface_override_material es más robusto para archivos FBX
+		for i in range(mesh.mesh.get_surface_count()):
+			mesh.set_surface_override_material(i, mat)
 
 func _find_meshes(node: Node) -> Array[MeshInstance3D]:
 	var result: Array[MeshInstance3D] = []
@@ -249,6 +261,33 @@ func _find_meshes(node: Node) -> Array[MeshInstance3D]:
 	for child in node.get_children():
 		result.append_array(_find_meshes(child))
 	return result
+
+func _center_model(model: Node3D) -> void:
+	# Calcular bounding box de todos los meshes PARA EL MODELO ENTERO
+	var meshes := _find_meshes(model)
+	if meshes.is_empty():
+		return
+	
+	var aabb := AABB()
+	var first := true
+	for mesh in meshes:
+		if mesh.mesh:
+			# IMPORTANTE: Obtener AABB local y transformarlo al espacio del 'model'
+			# Esto maneja casos donde el mesh está desplazado dentro del FBX
+			var local_aabb := mesh.mesh.get_aabb()
+			var mesh_transform := mesh.transform
+			var transformed_aabb := mesh_transform * local_aabb
+			
+			if first:
+				aabb = transformed_aabb
+				first = false
+			else:
+				aabb = aabb.merge(transformed_aabb)
+	
+	# Centrar el modelo: moverlo para que el centro del bounding box esté en (0,0,0) relativo a 'visual'
+	# BUG FIX: El desplazamiento debe tener en cuenta la escala y rotación del propio modelo (multiplicando por ellas)
+	var center := aabb.get_center()
+	model.position = -(model.quaternion * (model.scale * center))
 
 func _make_fallback_mesh() -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()
@@ -267,35 +306,36 @@ func _make_fallback_mesh() -> MeshInstance3D:
 
 func _process(delta: float) -> void:
 	if _is_dropped:
+		# FIX: Use class member, not local variable (was shadowing and breaking despawn)
 		_despawn_timer += delta
+		if _despawn_timer >= 5.0:
+			_fade_and_die()
 
 func _on_body_entered(body: Node3D) -> void:
-	print("StylooPickup: Body entered - ", body.name, " groups: ", body.get_groups())
-	
-	# Permitir pickup en servidor O en modo offline single-player
+	# Pickup automático al tocar un jugador
+	# Solo funciona en servidor o modo offline
 	var is_authority = multiplayer.is_server() or not multiplayer.has_multiplayer_peer() or multiplayer.multiplayer_peer is OfflineMultiplayerPeer
 	if not is_authority:
-		print("StylooPickup: Not authority, ignoring")
 		return
 	
+	# Cooldown para armas recién droppeadas (evitar recoger inmediatamente)
 	if _is_dropped and _despawn_timer < 0.5:
-		print("StylooPickup: Dropped recently, ignoring")
 		return
 	
 	if body.is_in_group("player"):
-		print("StylooPickup: Body is player, has method: ", body.has_method("pickup_styloo_weapon"))
 		if body.has_method("pickup_styloo_weapon"):
-			print("StylooPickup: Calling pickup_styloo_weapon with ", weapon_type)
+			# ÚNICO DEBUG PERMITIDO: Informar del arma recogida
+			print("WEAPON PICKED UP: ", weapon_type)
+			
 			body.pickup_styloo_weapon(weapon_type, _weapon_data)
-			# Destruir localmente en modo offline, RPC en modo online
-			if multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
-				rpc_destroy.rpc()
+			# Destruir pickup — FIX: authority check before RPC
+			if multiplayer.is_server() or not multiplayer.has_multiplayer_peer():
+				if multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
+					rpc_destroy.rpc()
+				else:
+					queue_free()
 			else:
-				queue_free()
-		else:
-			print("StylooPickup: Player missing pickup_styloo_weapon method!")
-	else:
-		print("StylooPickup: Body not in 'player' group")
+				rpc_destroy.rpc_id(1)
 
 @rpc("authority", "call_local")
 func rpc_destroy() -> void:

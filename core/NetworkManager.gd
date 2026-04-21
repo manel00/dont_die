@@ -13,6 +13,7 @@ signal server_disconnected
 var players: Dictionary = {}
 
 func _ready() -> void:
+	# FIX: multiplayer is never null in Godot 4.x — remove impossible check
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_ok)

@@ -85,6 +85,11 @@ func _explode() -> void:
 	queue_free()
 
 func _spawn_explosion_vfx() -> void:
+	# BUG FIX: Add null check for current_scene
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	
 	# Bola de fuego expandiÃ©ndose
 	var fireball := CSGSphere3D.new()
 	fireball.radius = 0.3
@@ -94,10 +99,10 @@ func _spawn_explosion_vfx() -> void:
 	mat.emission = Color(2.0, 0.8, 0.0)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	fireball.material = mat
-	get_tree().current_scene.add_child(fireball)
+	scene.add_child(fireball)
 	fireball.global_position = global_position + Vector3(0, 0.5, 0)
 	
-	var tw := get_tree().current_scene.create_tween().set_parallel(true)
+	var tw := scene.create_tween().set_parallel(true)
 	tw.tween_property(fireball, "radius", explosion_radius * 0.8, 0.3)
 	tw.tween_property(mat, "albedo_color:a", 0.0, 0.4)
 	tw.chain().tween_callback(fireball.queue_free)
@@ -118,7 +123,7 @@ func _spawn_explosion_vfx() -> void:
 	particles.one_shot = true
 	particles.explosiveness = 0.95
 	particles.lifetime = 1.5
-	get_tree().current_scene.add_child(particles)
+	scene.add_child(particles)
 	particles.global_position = global_position + Vector3(0, 0.5, 0)
 	particles.emitting = true
 	

@@ -24,5 +24,41 @@ Esta es una guía de reglas para evitar errores comunes heredados de cambios est
 - Cuando el jugador muere, es preferible realizar un `teleport` y resetear la vida en lugar de hacer `queue_free()` si no hay un sistema de Game Over robusto, para evitar romper referencias en el HUD o en los Bots aliados.
 
 ## 6. Sistema de Armas Styloo
-- **NO se puede recoger un arma del suelo si ya tienes una equipada.** Primero debes soltar la tuya (presiona Q o la tecla de drop) para poder recoger otra del suelo.
-- El temporizador `_despawn_timer` en `StylooWeaponPickup.gd` debe actualizarse en `_process()` para permitir recoger armas droppeadas después de 0.5 segundos.
+
+### Spawn de Armas
+- `WeaponSpawner` (autoload) genera **10 armas** automáticamente al inicio de la partida.
+- Las armas aparecen en posiciones aleatorias en un radio de **50 metros** alrededor del jugador.
+- Mínimo de **10 metros** de distancia del jugador para evitar spawn encima.
+
+### Pickup Automático
+- Al tocar visualmente el arma, se recoge automáticamente.
+- **NO se puede recoger si ya tienes un arma equipada.** La función `pickup_styloo_weapon()` retorna inmediatamente si `has_weapon` es true.
+- El jugador debe soltar primero su arma actual (presiona **Q**) antes de poder recoger otra.
+
+### Armas Droppeadas
+- Cuando sueltas un arma (tecla Q), aparece en el suelo.
+- Las armas droppeadas **desaparecen después de 5 segundos** (auto-despawn).
+- Cooldown de **0.5 segundos** tras droppear antes de poder recogerla (evitar recoger inmediatamente).
+
+### Posición en Mano
+- El arma equipada aparece en la **mano derecha** del personaje.
+- Posición relativa fija: `Vector3(0.25, 0.6, 0.35)` (derecha, altura, frente).
+- El arma es hijo de `visual_model` para rotar/sincronizar con el personaje.
+
+## 7. Prevención de Matriz Singular (det == 0)
+- **NUNCA** llames `look_at()` con un vector de dirección de longitud cero o que resulte en una matriz de transformación inválida (determinante = 0).
+- **SIEMPRE** verifica que la dirección tenga longitud suficiente antes de usar `look_at()`:
+  ```gdscript
+  if direction.length() > 0.001:
+      node.look_at(node.global_position + direction, Vector3.UP)
+  ```
+- Esto evita el crash `invert: Condition "det == 0" is true` en `core/math/basis.cpp`.
+
+## 8. Gestión de Recursos (Materials)
+- **NUNCA** llames `queue_free()` en objetos `Material` o `StandardMaterial3D`.
+- Los materiales son recursos (`Resource`), no nodos (`Node`). No tienen el método `queue_free()`.
+- Para liberar materiales duplicados, simplemente elimina las referencias:
+  ```gdscript
+  mesh.material_override = original_material
+  duplicated_material = null  # Se libera automáticamente cuando no hay referencias
+  ```

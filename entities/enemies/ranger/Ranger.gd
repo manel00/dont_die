@@ -1,4 +1,4 @@
-﻿extends EnemyBase
+extends EnemyBase
 
 ## Ranger â€” usa Skeleton_Rogue.glb (KayKit Skeletons) + Crossbow
 
@@ -19,7 +19,7 @@ func _ready() -> void:
 	current_health = max_health
 	attack_damage = 30  # +100% mÃ¡s daÃ±o
 	score_value = 60  # +50% mÃ¡s puntos
-	attack_cooldown = 1.4  # Ataques mÃ¡s frecuentes
+	attack_cooldown = 0.7  # Alta cadencia — mecha agresivo
 	_find_anim_player()
 	
 	# Attach Crossbow to hand (procedural for now, or just ensure it's in the scene)
@@ -83,30 +83,57 @@ func _update_animation() -> void:
 
 func _perform_attack() -> void:
 	if target == null: return
-	
+
 	var dir := global_position.direction_to(target.global_position)
 	var move_dir := Vector3(dir.x, 0, dir.z).normalized()
 	rotation.y = atan2(move_dir.x, move_dir.z)
-	
+
 	if _attack_timer <= 0.0:
 		_attack_timer = attack_cooldown
-		
-		# Shoot bolt
-		var proj := projectile_scene.instantiate()
-		proj.hit_group = "player"
-		proj.damage = 15
-		proj.speed = 35.0
-		
-		# Material for bolt
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color.ORANGE
-		material.emission_enabled = true
-		material.emission = Color.ORANGE
-		
-		get_tree().current_scene.add_child(proj)
-		proj.global_position = global_position + Vector3(0, 1.0, 0) + move_dir * 1.0
-		proj.direction = move_dir
-		
-		var mesh := proj.get_node_or_null("CSGSphere3D") as GeometryInstance3D
-		if mesh:
-			mesh.material_override = material
+		_shoot_electric_bolt(move_dir)
+
+## Dispara un bolt eléctrico amarillo de alta cadencia.
+func _shoot_electric_bolt(move_dir: Vector3) -> void:
+	var proj := projectile_scene.instantiate()
+	proj.hit_group = "player"
+	proj.damage = attack_damage
+	proj.speed = 40.0  # Muy rápido — mecha agresivo
+
+	# Color eléctrico amarillo brillante
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.9, 0.95, 0.1)
+	material.emission_enabled = true
+	material.emission = Color(1.0, 1.0, 0.0)
+	material.emission_energy_multiplier = 4.0
+
+	var scene := get_tree().current_scene
+	if not scene:
+		proj.queue_free()
+		return
+
+	scene.add_child(proj)
+	proj.global_position = global_position + Vector3(0, 1.0, 0) + move_dir * 1.0
+	proj.direction = move_dir
+
+	# Aplicar material eléctrico al mesh del proyectil
+	var mesh := proj.get_node_or_null("CSGSphere3D") as GeometryInstance3D
+	if not mesh:
+		for child in proj.get_children():
+			if child is GeometryInstance3D:
+				mesh = child
+				break
+	if mesh:
+		mesh.material_override = material
+
+	# Luz eléctrica amarilla en el proyectil
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 1.0, 0.2)
+	light.light_energy = 3.0
+	light.omni_range = 5.0
+	proj.add_child(light)
+
+	# Liberar luz cuando el proyectil muera
+	proj.tree_exiting.connect(func():
+		if is_instance_valid(light):
+			light.queue_free()
+	)

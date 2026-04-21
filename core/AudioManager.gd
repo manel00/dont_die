@@ -67,9 +67,8 @@ func _play_synth_sfx(frequency: float, duration: float, volume_db: float, bus: S
 	player.bus = bus
 	player.volume_db = volume_db * 10.0 - 10.0
 	add_child(player)
-	player.play()
-	
-	# Llenar el buffer con una onda simple
+
+	# FIX: Fill buffer BEFORE playing to avoid first-frame silence/garbage
 	await get_tree().process_frame
 	var pb := player.get_stream_playback() as AudioStreamGeneratorPlayback
 	if pb:
@@ -80,7 +79,10 @@ func _play_synth_sfx(frequency: float, duration: float, volume_db: float, bus: S
 			var sample: float = sin(t * frequency * TAU) * exp(-t * 8.0) * volume_db
 			pb.push_frame(Vector2(sample, sample))
 			t += dt
-	
+
+	# Now start playback after buffer is filled
+	player.play()
+
 	# Auto-limpiar
 	var cleanup_timer := get_tree().create_timer(duration + 0.1)
 	cleanup_timer.timeout.connect(player.queue_free)

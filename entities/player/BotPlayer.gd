@@ -474,8 +474,6 @@ func _try_shoot() -> void:
 	if not _target_enemy:
 		return
 	
-	var dist: float = global_position.distance_to(_target_enemy.global_position)
-	
 	# Execute attack based on combat mode
 	match _current_combat_mode:
 		CombatMode.MELEE:
@@ -548,7 +546,10 @@ func _rpc_spawn_melee_slash(pos: Vector3, dir: Vector3) -> void:
 	mat.emission_energy_multiplier = 2.0
 	slash.material_override = mat
 	
-	get_tree().current_scene.add_child(slash)
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	scene.add_child(slash)
 	slash.global_position = pos
 	
 	# Face the direction
@@ -557,7 +558,7 @@ func _rpc_spawn_melee_slash(pos: Vector3, dir: Vector3) -> void:
 	
 	# Animate and remove
 	var tween = create_tween()
-	var start_scale = slash.scale
+	# start_scale unused - using direct tween instead
 	slash.scale = Vector3.ZERO
 	var mat_color: Color = mat.albedo_color
 	tween.tween_property(slash, "scale", Vector3(1.5, 1.5, 1.5), 0.15)
@@ -614,7 +615,7 @@ func rpc_spawn_bot_projectile(pos: Vector3, dir: Vector3) -> void:
 			proj.global_position = pos
 			proj.direction = dir
 			proj.weapon_type = "shuriken4" # Use cool shuriken
-			proj.damage = max_health / 5 # Escala con su vida
+			proj.damage = int(max_health / 5.0) # Escala con su vida (float division)
 			proj.speed = 30.0
 			proj.life_time = 2.0
 

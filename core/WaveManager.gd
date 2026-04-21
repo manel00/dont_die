@@ -97,6 +97,9 @@ func _start_wave(wave_number: int) -> void:
 	var batch_size = min(10, _total_wave_enemies / 10)
 	_spawn_batch(batch_size)
 	
+	# Start batch timer for burst spawning (was created but never started - BUG FIX)
+	_spawn_batch_timer.start()
+	
 	# Start continuous spawning
 	spawn_timer.start()
 	
@@ -139,6 +142,8 @@ func _on_spawn_tick() -> void:
 
 func _on_batch_spawn() -> void:
 	if not _can_spawn():
+		# Stop batch timer when we can't spawn anymore (wave complete or at max enemies)
+		_spawn_batch_timer.stop()
 		return
 	_spawn_single_enemy()
 
@@ -267,6 +272,7 @@ func _complete_wave() -> void:
 	_wave_in_progress = false
 	is_spawning = false
 	spawn_timer.stop()
+	_spawn_batch_timer.stop()  # BUG FIX: Also stop batch timer
 	
 	wave_cleared.emit(current_wave)
 	

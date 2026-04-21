@@ -620,7 +620,10 @@ func _set_editor_camera(params: Dictionary) -> Dictionary:
 	# Look at target (overrides rotation if set)
 	if params.has("look_at"):
 		var t: Dictionary = params["look_at"]
-		cam.look_at(Vector3(float(t.get("x", 0)), float(t.get("y", 0)), float(t.get("z", 0))))
+		var target := Vector3(float(t.get("x", 0)), float(t.get("y", 0)), float(t.get("z", 0)))
+		# BUG FIX: Avoid singular matrix (det == 0) by checking target is valid and different from position
+		if target != cam.position and target.length() > 0.001:
+			cam.look_at(target)
 
 	# Set FOV
 	if params.has("fov"):

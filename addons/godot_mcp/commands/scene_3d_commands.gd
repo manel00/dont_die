@@ -579,7 +579,9 @@ func _setup_camera_3d(params: Dictionary) -> Dictionary:
 	if params.has("look_at"):
 		var target := _parse_vector3_param(params, "look_at", Vector3.ZERO)
 		# We need to set position first, then use look_at
-		camera.look_at(target)
+		# BUG FIX: Avoid singular matrix (det == 0) by checking target is valid and different from position
+		if target != camera.position and target.length() > 0.001:
+			camera.look_at(target)
 
 	# Environment override
 	if params.has("environment_path"):

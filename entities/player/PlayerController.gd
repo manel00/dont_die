@@ -58,10 +58,7 @@ var _anim_player: AnimationPlayer = null
 
 # Grenade system
 var _grenade_charge: float = 0.0
-var _grenade_start_dir: Vector3 = Vector3.FORWARD
-var _grenade_start_charge: float = 0.0
 var _is_charging_grenade: bool = false
-var _grenade_trajectory_points: Array[Node3D] = []
 const GRENADE_MAX_CHARGE: float = 2.0
 const GRENADE_MIN_THROW_FORCE: float = 10.0
 const GRENADE_MAX_THROW_FORCE: float = 25.0
@@ -241,33 +238,52 @@ func _handle_movement(delta: float) -> void:
 		var target_rot := atan2(last_look_dir.x, last_look_dir.z)
 		visual_model.rotation.y = lerp_angle(visual_model.rotation.y, target_rot, 15.0 * delta)
 
+# BUG FIX: Track physical key states to prevent multiple activations per frame
+var _prev_key_states: Dictionary = {}
+
 func _handle_abilities() -> void:
+	# Helper to check physical key with edge detection (BUG FIX: prevents multi-fire)
+	var _check_physical_key := func(key: int) -> bool:
+		var key_name = str(key)
+		var is_pressed = Input.is_physical_key_pressed(key)
+		var was_pressed = _prev_key_states.get(key_name, false)
+		_prev_key_states[key_name] = is_pressed
+		return is_pressed and not was_pressed
+	
 	# Ability 0: Katana (0 or Numpad 0)
-	if Input.is_action_just_pressed("weapon_0") or Input.is_physical_key_pressed(KEY_KP_0) or Input.is_physical_key_pressed(KEY_0):
+	if Input.is_action_just_pressed("weapon_0") or _check_physical_key.call(KEY_KP_0) or _check_physical_key.call(KEY_0):
 		_attack_katana()
 
 	# Ability 1: Fireball (1 or Numpad 1)
-	if Input.is_action_just_pressed("weapon_1") or Input.is_physical_key_pressed(KEY_KP_1) or Input.is_physical_key_pressed(KEY_1):
+	if Input.is_action_just_pressed("weapon_1") or _check_physical_key.call(KEY_KP_1) or _check_physical_key.call(KEY_1):
 		_cast_fireball()
 
 	# Ability 2: AOE Explosion (2 or Numpad 2)
-	if Input.is_action_just_pressed("weapon_2") or Input.is_physical_key_pressed(KEY_KP_2) or Input.is_physical_key_pressed(KEY_2):
+	if Input.is_action_just_pressed("weapon_2") or _check_physical_key.call(KEY_KP_2) or _check_physical_key.call(KEY_2):
 		_aoe_explosion()
 
 	# Ability 3: Weapon (3 or Numpad 3 if has_weapon)
-	if (Input.is_action_just_pressed("weapon_3") or Input.is_physical_key_pressed(KEY_KP_3) or Input.is_physical_key_pressed(KEY_3)) and has_weapon:
+	if (Input.is_action_just_pressed("weapon_3") or _check_physical_key.call(KEY_KP_3) or _check_physical_key.call(KEY_3)) and has_weapon:
 		_fire_weapon()
 	
 	# Ability 4: Grenade (4 or Numpad 4) - Hold to charge, release to throw
 	_handle_grenade_input()
 	
-	if Input.is_action_just_pressed("drop_weapon") or Input.is_physical_key_pressed(KEY_Q):
+	if Input.is_action_just_pressed("drop_weapon") or _check_physical_key.call(KEY_Q):
 		if has_weapon:
 			_drop_weapon()
 	
 
 func _handle_grenade_input() -> void:
-	if Input.is_action_just_pressed("weapon_4") or Input.is_physical_key_pressed(KEY_KP_4) or Input.is_physical_key_pressed(KEY_4):
+	# BUG FIX: Use edge detection for physical keys
+	var _check_physical_key := func(key: int) -> bool:
+		var key_name = str(key)
+		var is_pressed = Input.is_physical_key_pressed(key)
+		var was_pressed = _prev_key_states.get(key_name, false)
+		_prev_key_states[key_name] = is_pressed
+		return is_pressed and not was_pressed
+	
+	if Input.is_action_just_pressed("weapon_4") or _check_physical_key.call(KEY_KP_4) or _check_physical_key.call(KEY_4):
 		if not _is_charging_grenade:
 			_start_grenade_charge()
 	
@@ -279,80 +295,18 @@ func _handle_grenade_input() -> void:
 func _start_grenade_charge() -> void:
 	_grenade_charge = 0.0
 	_is_charging_grenade = true
-	_spawn_trajectory_preview()
 
 func _update_grenade_charge() -> void:
 	_grenade_charge += get_physics_process_delta_time()
 	_grenade_charge = min(_grenade_charge, GRENADE_MAX_CHARGE)
-	_update_trajectory_preview()
-
-func _spawn_trajectory_preview() -> void:
-	# Clear existing points
-	_clear_trajectory_preview()
-	
-	# Create pool of trajectory points (red spheres)
-	for i in range(20):
-		var point = CSGSphere3D.new()
-		point.radius = 0.2
-		point.radial_segments = 16
-		point.rings = 8
-		
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(1.0, 0.0, 0.0, 0.7)
-		mat.emission_enabled = true
-		mat.emission = Color(1.0, 0.0, 0.0)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		point.material = mat
-		
-		point.visible = false
-		var scene := get_tree().current_scene
-		if scene:
-			scene.add_child(point)
-			_grenade_trajectory_points.append(point)
-
-func _update_trajectory_preview() -> void:
-	if _grenade_trajectory_points.is_empty():
-		return
-
-	var charge_pct: float = _grenade_charge / GRENADE_MAX_CHARGE
-	var throw_force: float = lerp(GRENADE_MIN_THROW_FORCE, GRENADE_MAX_THROW_FORCE, charge_pct)
-
-	# Usar la dirección actual del jugador
-	var throw_dir := _get_look_direction()
-
-	var start_pos: Vector3 = global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5
-	var velocity: Vector3 = throw_dir * throw_force
-	velocity.y = 8.0 * (0.5 + charge_pct * 0.5)  # Higher arc with more charge
-	
-	var gravity := Vector3(0, -20.0, 0)
-	var time_step := 0.05
-	
-	for i in range(_grenade_trajectory_points.size()):
-		var t: float = time_step * i
-		var pos: Vector3 = start_pos + velocity * t + 0.5 * gravity * t * t
-		
-		var point := _grenade_trajectory_points[i]
-		point.global_position = pos
-		
-		# Fade out points further along the trajectory
-		var alpha := 0.8 * (1.0 - float(i) / _grenade_trajectory_points.size())
-		if point.material:
-			point.material.albedo_color.a = alpha
-		
-		point.visible = pos.y > 0.0  # Hide if below ground
-
-func _clear_trajectory_preview() -> void:
-	for point in _grenade_trajectory_points:
-		if is_instance_valid(point):
-			point.queue_free()
-	_grenade_trajectory_points.clear()
 
 func _get_look_direction() -> Vector3:
-	# Usar la rotación Y del visual_model para obtener la dirección exacta donde apunta
+	# Usar la rotación del visual_model (donde mira el personaje)
 	if visual_model:
 		var rot_y := visual_model.rotation.y
 		return Vector3(sin(rot_y), 0, cos(rot_y)).normalized()
-	# Fallback a last_look_dir si no hay visual_model
+	
+	# Fallback a last_look_dir
 	if last_look_dir.length() > 0.1:
 		return last_look_dir.normalized()
 	return Vector3.FORWARD
@@ -365,7 +319,12 @@ func _throw_grenade() -> void:
 
 	# Capturar dirección y posición exactas en el momento del lanzamiento
 	var throw_dir := _get_look_direction()
-	var spawn_pos := global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5
+	# CRITICAL FIX: Use weapon visual position for grenade spawn if available
+	var spawn_pos: Vector3
+	if _weapon_visual:
+		spawn_pos = _weapon_visual.global_position + throw_dir * 0.5
+	else:
+		spawn_pos = global_position + Vector3(0, 1.5, 0) + throw_dir * 0.5
 
 	var throw_velocity: Vector3 = throw_dir * throw_force
 	throw_velocity.y = 8.0 * (0.5 + charge_pct * 0.5)
@@ -375,9 +334,6 @@ func _throw_grenade() -> void:
 		rpc_spawn_grenade.rpc(spawn_pos, throw_velocity)
 	else:
 		rpc_id(1, "rpc_request_grenade", spawn_pos, throw_velocity)
-	
-	# Clear trajectory
-	_clear_trajectory_preview()
 	
 	# Animación de lanzamiento - solo escala, no rotación para evitar caer del mapa
 	if visual_model:
@@ -437,7 +393,9 @@ func rpc_execute_katana(pos: Vector3, l_dir: Vector3) -> void:
 	if scene:
 		scene.add_child(slash)
 		slash.global_position = pos + Vector3(0, 1.0, 0) + l_dir * 1.5
-		slash.look_at(slash.global_position + l_dir, Vector3.UP)
+		# BUG FIX: Avoid singular matrix (det == 0) by checking direction length
+		if l_dir.length() > 0.001:
+			slash.look_at(slash.global_position + l_dir, Vector3.UP)
 		
 		var tw_slash = create_tween().set_parallel(true)
 		tw_slash.tween_property(slash, "scale", Vector3(1.5, 0.5, 2.5), 0.2)
@@ -529,12 +487,20 @@ func _fire_weapon() -> void:
 
 func _fire_ranged_projectile() -> void:
 	"""Disparar proyectil ranged (shurikens, kunai, hachas)."""
-	var spawn_pos = global_position + Vector3(0, 1.0, 0) + last_look_dir * 0.8
+	# Usar la dirección real hacia donde mira el personaje (visual_model)
+	var shoot_dir := _get_look_direction()
+	
+	# CRITICAL FIX: Posición de spawn desde el arma visual
+	var spawn_pos: Vector3
+	if _weapon_visual:
+		spawn_pos = _weapon_visual.global_position + shoot_dir * 0.5
+	else:
+		spawn_pos = global_position + Vector3(0, 1.0, 0) + shoot_dir * 0.8
 	
 	if multiplayer.is_server():
-		rpc_spawn_styloo_projectile.rpc(spawn_pos, last_look_dir, _current_styloo_weapon, _current_weapon_data)
+		rpc_spawn_styloo_projectile.rpc(spawn_pos, shoot_dir, _current_styloo_weapon, _current_weapon_data)
 	else:
-		rpc_id(1, "rpc_request_styloo_projectile", spawn_pos, last_look_dir, _current_styloo_weapon, _current_weapon_data)
+		rpc_id(1, "rpc_request_styloo_projectile", spawn_pos, shoot_dir, _current_styloo_weapon, _current_weapon_data)
 	
 	# AnimaciÃ³n de lanzamiento
 	if _anim_player and _anim_player.has_animation("CharacterArmature|Punch"):
@@ -680,7 +646,9 @@ func _spawn_weapon_attack_effect(pos: Vector3, dir: Vector3, weapon_range: float
 	
 	scene.add_child(slash)
 	slash.global_position = pos + Vector3(0, 1.0, 0) + dir * (weapon_range * 0.5)
-	slash.look_at(slash.global_position + dir, Vector3.UP)
+	# BUG FIX: Avoid singular matrix (det == 0) by checking direction length
+	if dir.length() > 0.001:
+		slash.look_at(slash.global_position + dir, Vector3.UP)
 	
 	# Trail particles
 	var trail = GPUParticles3D.new()
@@ -917,8 +885,10 @@ func pickup_weapon(_weapon_type: String = "sword") -> void:
 	pickup_styloo_weapon("sword1", {})
 
 func pickup_styloo_weapon(weapon_type: String, weapon_data: Dictionary) -> void:
+	# BUG FIX: No permitir recoger arma si ya tiene una equipada (según regla del proyecto)
 	if has_weapon:
-		_drop_weapon()
+		print("PlayerController: Cannot pickup weapon, already have one equipped. Drop first with Q")
+		return
 
 	has_weapon = true
 	_current_styloo_weapon = weapon_type
@@ -976,13 +946,31 @@ func _setup_styloo_weapon_visual() -> void:
 		for ap in anim_players:
 			ap.queue_free()
 			
-		# Aplicar escala y posiciÃ³n de mano del personaje (corregido factor x300 del importer FBX para que el arma se vea realista y amenazante)
-		var hand_scale := Vector3(0.008, 0.008, 0.008) * 300.0  # TamaÃ±o visible real
-		_weapon_visual.scale = hand_scale
-		_weapon_visual.position = Vector3(0.2, 0.5, 0.3)  # PosiciÃ³n en mano derecha
+		# BUG FIX: Posicionar arma en mano derecha del personaje
+		# Categorización de tamaños para balance visual progresivo
+		var weapon_key: String = _current_styloo_weapon.to_lower()
+		var is_very_small: bool = weapon_key.contains("shuriken") or weapon_key == "kunai" or weapon_key.contains("knife") or weapon_key == "bayonet"
+		var is_sword_katana: bool = weapon_key.contains("sword") or weapon_key.contains("katana")
+		
+		if is_very_small:
+			# Objetos minúsculos (shurikens, cuchillos): escala 2700x
+			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 2700.0
+			_weapon_visual.position = Vector3(0.15, 0.55, 0.25)
+		elif is_sword_katana:
+			# Espadas y katanas: Reducidas un 50% según el usuario (450x del base 0.008)
+			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 450.0
+			_weapon_visual.position = Vector3(0.25, 0.6, 0.35)
+		else:
+			# Otros (hachas, picos): Escala normal 900x (3x el original de 300x)
+			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 900.0
+			_weapon_visual.position = Vector3(0.25, 0.6, 0.35)
+			
 		_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
 		# Aplicar la textura correcta
 		_apply_weapon_materials_to_node(_weapon_visual)
+		
+		# CRITICAL FIX: Centrar el arma equipada para evitar offsets aleatorios del FBX
+		_center_equipped_model(_weapon_visual)
 		visual_model.add_child(_weapon_visual)
 		# print("Weapon equipped successfully")
 	else:
@@ -991,13 +979,43 @@ func _setup_styloo_weapon_visual() -> void:
 		_weapon_visual = _create_fallback_weapon_visual()
 		visual_model.add_child(_weapon_visual)
 
+func _center_equipped_model(model: Node3D) -> void:
+	# Calcular bounding box local de todos los meshes
+	var result: Array[MeshInstance3D] = []
+	var stack = [model]
+	while not stack.is_empty():
+		var n = stack.pop_back()
+		if n is MeshInstance3D: result.append(n)
+		stack.append_array(n.get_children())
+	
+	if result.is_empty(): return
+	
+	var aabb := AABB()
+	var first := true
+	for mesh in result:
+		if mesh.mesh:
+			var transformed_aabb := mesh.transform * mesh.mesh.get_aabb()
+			if first: aabb = transformed_aabb; first = false
+			else: aabb = aabb.merge(transformed_aabb)
+	
+	# Centrar model.position incluyendo escala y rotación
+	# El arma se coloca en el punto configurado (ej. mano), pero centrando su masa visual
+	var current_pos = model.position
+	model.position = current_pos - (model.quaternion * (model.scale * aabb.get_center()))
+
 func _apply_weapon_materials_to_node(node: Node) -> void:
 	if not _shared_styloo_mat:
-		var mat_path = "res://assets/models/weapons/weaponsassetspackbyStyloo/textures/Textures.mat"
-		if ResourceLoader.exists(mat_path):
-			_shared_styloo_mat = load(mat_path)
+		var tex_path = "res://assets/models/weapons/weaponsassetspackbyStyloo/3D weapons asset pack.png"
+		if ResourceLoader.exists(tex_path):
+			var tex = load(tex_path)
+			var mat = StandardMaterial3D.new()
+			mat.albedo_texture = tex
+			mat.metallic = 0.2
+			mat.roughness = 0.8
+			_shared_styloo_mat = mat
 			
 	if node is MeshInstance3D and _shared_styloo_mat:
+		# Usar surface_override_material para asegurar que llega a todos los sub-meshes del FBX
 		for i in range(node.mesh.get_surface_count()):
 			node.set_surface_override_material(i, _shared_styloo_mat)
 				

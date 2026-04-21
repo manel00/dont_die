@@ -108,6 +108,10 @@ func _perform_attack() -> void:
 					_blood_effect(e.global_position)
 
 func _blood_effect(pos: Vector3) -> void:
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	
 	var blood = CSGSphere3D.new()
 	blood.radius = 0.3
 	var mat = StandardMaterial3D.new()
@@ -115,7 +119,7 @@ func _blood_effect(pos: Vector3) -> void:
 	mat.emission_enabled = true
 	mat.emission = Color(0.5, 0.0, 0.0)
 	blood.material = mat
-	get_tree().current_scene.add_child(blood)
+	scene.add_child(blood)
 	blood.global_position = pos + Vector3(0, 0.5, 0)
 	
 	var tw = create_tween()

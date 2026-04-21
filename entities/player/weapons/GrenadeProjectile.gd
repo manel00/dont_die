@@ -1,172 +1,188 @@
-﻿class_name GrenadeProjectile
-extends Area3D
+class_name GrenadeProjectile
+extends RigidBody3D
 
 @export var damage: int = 60
 @export var explosion_radius: float = 6.0
 @export var life_time: float = 4.0
 @export var hit_group: String = "enemies"
 
-
-
 var initial_velocity: Vector3 = Vector3.ZERO
-var _velocity: Vector3 = Vector3.ZERO
 var _has_exploded: bool = false
-var _spin_speed: float = 360.0  # RPM
+var _armed: bool = false
+
+
 
 func _ready() -> void:
-	body_entered.connect(_on_body_entered)
 	add_to_group("projectiles")
-	
-	# Auto-destruir despuÃ©s de tiempo de vida
-	var timer = get_tree().create_timer(life_time)
+
+	# Propiedades físicas — gravedad manual para coincidir con la preview
+	mass = 1.0
+	gravity_scale = 0.0
+	linear_damp = 0.0
+	angular_damp = 0.0
+	physics_material_override = PhysicsMaterial.new()
+	physics_material_override.bounce = 0.4
+	physics_material_override.friction = 0.5
+
+	contact_monitor = true
+	max_contacts_reported = 4
+	body_entered.connect(_on_body_entered)
+
+	# Timer de vida
+	var timer := get_tree().create_timer(life_time)
 	timer.timeout.connect(_explode)
-	
-	# Crear mesh visual
+
 	_create_visual()
-	
-	# Usar velocidad inicial provista por el lanzador
+
 	if initial_velocity != Vector3.ZERO:
-		_velocity = initial_velocity
+		linear_velocity = initial_velocity
+		_armed = true
 	else:
-		_velocity = Vector3.FORWARD * 15.0  # Fallback
-		_velocity.y = 8.0
+		call_deferred("_apply_initial_velocity")
+
+func _apply_initial_velocity() -> void:
+	if initial_velocity != Vector3.ZERO and not _armed:
+		linear_velocity = initial_velocity
+		_armed = true
 
 func _create_visual() -> void:
-	var mesh_instance = MeshInstance3D.new()
+	if has_node("GrenadeMesh"):
+		return
+
+	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.name = "GrenadeMesh"
 	add_child(mesh_instance)
-	
-	# Mesh esfÃ©rico para granada
-	mesh_instance.mesh = SphereMesh.new()
-	mesh_instance.mesh.radius = 0.25
-	mesh_instance.mesh.height = 0.5
-	
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.3, 0.3, 0.3)  # Gris metÃ¡lico
+
+	var sphere_mesh := SphereMesh.new()
+	sphere_mesh.radius = 0.25
+	sphere_mesh.height = 0.5
+	mesh_instance.mesh = sphere_mesh
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.3, 0.3, 0.3)
 	mat.metallic = 0.8
 	mat.roughness = 0.4
-	
-	# EmisiÃ³n roja pulsante
 	mat.emission_enabled = true
 	mat.emission = Color(1.0, 0.0, 0.2)
 	mat.emission_energy_multiplier = 2.0
-	
 	mesh_instance.material_override = mat
-	
-	# Luz roja pulsante
-	var light = OmniLight3D.new()
+
+	var light := OmniLight3D.new()
 	light.name = "GrenadeLight"
 	light.light_color = Color(1.0, 0.0, 0.1)
 	light.light_energy = 3.0
 	light.omni_range = 4.0
 	add_child(light)
-	
-	# AnimaciÃ³n de pulso
-	var tw = create_tween().set_loops().set_parallel(true)
-	tw.tween_property(light, "light_energy", 5.0, 0.3)
-	tw.chain().tween_property(light, "light_energy", 2.0, 0.3)
 
-func _physics_process(delta: float) -> void:
-	# Gravedad
-	_velocity.y -= 20.0 * delta
-	
-	# Mover
-	global_position += _velocity * delta
-	
-	# Rotar
-	rotate_z(deg_to_rad(_spin_speed * delta))
-	
-	# Detectar suelo
-	if global_position.y <= 0.25:
-		global_position.y = 0.25
-		_explode()
+	# Pulso de la luz (usando set_loops correctamente)
+	var tw := create_tween()
+	tw.set_loops()
+	tw.tween_property(light, "light_energy", 5.0, 0.3)
+	tw.tween_property(light, "light_energy", 1.5, 0.3)
+
+const GRAVITY: float = -20.0
+
+func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
+	state.linear_velocity.y += GRAVITY * state.step
+	if global_position.y < -20:
+		queue_free()
 
 func _on_body_entered(body: Node3D) -> void:
 	if _has_exploded:
 		return
-	
-	# ExplosiÃ³n al tocar enemigo
 	if body.is_in_group(hit_group) and body.has_method("take_damage"):
 		_explode()
-	elif body is StaticBody3D or body is CSGShape3D:
-		# ExplosiÃ³n al tocar suelo/escenario
+	elif body.is_in_group("world") or body is StaticBody3D or body is CSGShape3D:
 		_explode()
 
 func _explode() -> void:
 	if _has_exploded:
 		return
 	_has_exploded = true
-	
-	# DaÃ±o en Ã¡rea
-	var targets := get_tree().get_nodes_in_group(hit_group)
-	for t in targets:
-		if is_instance_valid(t) and t is Node3D:
-			var dist = t.global_position.distance_to(global_position)
-			if dist <= explosion_radius:
-				if t.has_method("take_damage"):
-					var damage_mult = 1.0 - (dist / explosion_radius)
-					var final_damage = int(damage * damage_mult)
-					t.take_damage(final_damage)
-	
-	# Efecto visual de explosiÃ³n
-	_spawn_explosion_effect()
+	freeze = true
 
-	# Destruir inmediatamente
+	# Guardar posición antes de destruir el nodo
+	var explosion_pos: Vector3 = global_position
+	var scene: Node = get_tree().current_scene
+
+	# 1) Lanzar efecto ANTES de queue_free (el efecto es autónomo)
+	_spawn_explosion_effect(explosion_pos, scene)
+
+	# 2) Daño en área + flash visual en enemigos afectados
+	_apply_area_damage(explosion_pos, scene)
+
+	# 3) Destruir el proyectil
 	queue_free()
 
-func _spawn_explosion_effect() -> void:
-	var scene = get_tree().current_scene
+# ---------------------------------------------------------------------------
+# Instancia ExplosionEffect como nodo autónomo en la escena raíz
+# ---------------------------------------------------------------------------
+func _spawn_explosion_effect(pos: Vector3, scene: Node) -> void:
 	if not scene:
 		return
-	
-	# Esfera de explosiÃ³n
-	var explosion = CSGSphere3D.new()
-	explosion.radius = 0.5
-	explosion.radial_segments = 32
-	explosion.rings = 16
-	
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.1, 0.0, 0.8)
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.3, 0.0)
+
+	var effect: ExplosionEffect = ExplosionEffect.new()
+	effect.blast_radius = explosion_radius
+	scene.add_child(effect)
+	effect.global_position = pos
+
+# ---------------------------------------------------------------------------
+# Daño con falloff de distancia + flash naranja en cada enemigo golpeado
+# ---------------------------------------------------------------------------
+func _apply_area_damage(pos: Vector3, scene: Node) -> void:
+	var targets := get_tree().get_nodes_in_group(hit_group)
+	for i in range(targets.size()):
+		var t: Node = targets[i]
+		if not is_instance_valid(t):
+			continue
+		if not t is Node3D:
+			continue
+		var target_3d := t as Node3D
+		var dist: float = target_3d.global_position.distance_to(pos)
+		if dist <= explosion_radius:
+			# Daño con falloff lineal (mínimo 10% del daño base)
+			var falloff: float = 1.0 - (dist / explosion_radius)
+			falloff = clampf(falloff, 0.1, 1.0)
+			var final_damage: int = int(float(damage) * falloff)
+			if target_3d.has_method("take_damage"):
+				target_3d.call("take_damage", final_damage)
+			# Flash amarillo/naranja visual en el enemigo afectado
+			_flash_enemy_hit(target_3d, scene)
+
+# ---------------------------------------------------------------------------
+# Flash naranja en el enemigo afectado por la explosión
+# ---------------------------------------------------------------------------
+func _flash_enemy_hit(enemy: Node3D, scene: Node) -> void:
+	if not scene:
+		return
+
+	# Flash en el enemigo: un quad naranja translúcido que aparece y desaparece
+	var flash := MeshInstance3D.new()
+	flash.name = "EnemyHitFlash"
+
+	var quad := SphereMesh.new()
+	quad.radius = 0.6
+	quad.height = 1.2
+	quad.radial_segments = 8
+	quad.rings = 4
+	flash.mesh = quad
+
+	var mat := StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	explosion.material = mat
-	
-	scene.add_child(explosion)
-	explosion.global_position = global_position
-	
-	# AnimaciÃ³n de expansiÃ³n
-	var tw = create_tween().set_parallel(true)
-	tw.tween_property(explosion, "radius", explosion_radius, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(mat, "albedo_color:a", 0.0, 0.4)
-	tw.chain().tween_callback(explosion.queue_free)
-	
-	# PartÃ­culas de explosiÃ³n
-	var particles = GPUParticles3D.new()
-	particles.amount = 50
-	particles.lifetime = 1.0
-	particles.explosiveness = 1.0
-	particles.local_coords = false
-	
-	var pmat = ParticleProcessMaterial.new()
-	pmat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	pmat.emission_sphere_radius = 0.5
-	pmat.initial_velocity_min = 5.0
-	pmat.initial_velocity_max = 15.0
-	pmat.gravity = Vector3(0, -9.8, 0)
-	pmat.color = Color(1.0, 0.2, 0.0)
-	pmat.scale_min = 0.05
-	pmat.scale_max = 0.2
-	particles.process_material = pmat
-	
-	var pmesh = SphereMesh.new()
-	pmesh.radius = 0.08
-	pmesh.height = 0.16
-	particles.draw_pass_1 = pmesh
-	
-	scene.add_child(particles)
-	particles.global_position = global_position
-	
-	# Auto-limpiar partÃ­culas
-	var timer = get_tree().create_timer(1.5)
-	timer.timeout.connect(particles.queue_free)
+	mat.albedo_color = Color(1.0, 0.5, 0.0, 0.9)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.7, 0.0)
+	mat.emission_energy_multiplier = 5.0
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	flash.material_override = mat
+
+	scene.add_child(flash)
+	flash.global_position = enemy.global_position + Vector3(0, 0.8, 0)
+
+	# Tween propio del flash (sobrevive sin depender del grenade)
+	var tw := flash.create_tween().set_parallel(true)
+	tw.tween_property(flash, "scale", Vector3(1.8, 1.8, 1.8), 0.1)\
+		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.35)\
+		.set_trans(Tween.TRANS_QUAD)
+	tw.chain().tween_callback(flash.queue_free)

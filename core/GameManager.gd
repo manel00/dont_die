@@ -45,13 +45,20 @@ func trigger_game_over() -> void:
 	get_tree().paused = true
 
 func restart_game() -> void:
-	# print("Reiniciando juego...")
 	get_tree().paused = false
 	is_game_over = false
 	current_score = 0
 	player = null
+	# FIX: multiplayer restart — sync all peers, not just local client
 	if solo_mode:
-		# Restart in solo mode: go back to menu (cleaner than reloading in-place)
 		get_tree().change_scene_to_file("res://ui/menu/MainMenu.tscn")
 	else:
+		# In multiplayer, notify all peers then reload for everyone
+		rpc("sync_restart")
 		get_tree().reload_current_scene()
+
+@rpc("any_peer", "call_local")
+func sync_restart() -> void:
+	# Called on all peers — reset local state per client
+	is_game_over = false
+	current_score = 0

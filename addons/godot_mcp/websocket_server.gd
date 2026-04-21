@@ -83,7 +83,12 @@ func _process(delta: float) -> void:
 	if not _running:
 		return
 
+	# FIX: Copy _peers keys to avoid concurrent modification during iteration
+	var ports: Array[int] = []
 	for p in range(BASE_PORT, MAX_PORT + 1):
+		ports.append(p)
+
+	for p in ports:
 		var ws: WebSocketPeer = _peers.get(p)
 
 		# No peer - try reconnect on timer

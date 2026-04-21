@@ -18,6 +18,7 @@ var _max_pierce: int = 3
 var _is_axe: bool = false
 var _spin_speed: float = 0.0
 var _damaged_enemies: Dictionary = {}  # Track enemigos ya daÃ±ados (para evitar daÃ±o mÃºltiple)
+const MAX_DAMAGED_TRACKED: int = 20  # BUG FIX: Limit dictionary size to prevent memory leak
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
@@ -42,13 +43,13 @@ func _setup_weapon_behavior() -> void:
 			_max_pierce = 0  # No atraviesa, rebota
 			_spin_speed = 720.0  # RPM de rotaciÃ³n
 			
-		"kunai":
-			# Kunai: Muy rÃ¡pido, atraviesa 3 enemigos
+		"kunai", "coolknife", "bayonet":
+			# Cuchillos: Muy rÃ¡pido, atraviesa 3 enemigos, vuela recto
 			speed = 45.0
 			damage = 28
 			life_time = 2.0
 			_max_pierce = 3
-			_spin_speed = 0  # No rota, vuela recto
+			_spin_speed = 0  # No rota, vuela recto (apunta con la punta)
 			
 		"doubleAxe", "simpleAxe":
 			# Hachas: Lento pero devastador, daÃ±o en Ã¡rea
@@ -59,60 +60,111 @@ func _setup_weapon_behavior() -> void:
 			_spin_speed = 360.0  # Gira lentamente
 			_is_axe = true
 	
-	# Crear mesh visual
+	# Crear mesh visual usando el modelo real del arma
 	_create_visual_mesh()
+	
+const WEAPON_PACK_PATH := "res://assets/models/weapons/weaponsassetspackbyStyloo/"
 
 func _create_visual_mesh() -> void:
-	var mesh_instance = MeshInstance3D.new()
-	add_child(mesh_instance)
+	# Contenedor para aplicar rotaciones base sin romper la orientación global
+	var model_container = Node3D.new()
+	model_container.name = "ModelContainer"
+	add_child(model_container)
 	
-	var mat = StandardMaterial3D.new()
+	# Determinar archivo a cargar
+	var weapon_file := "ASSETS.fbx_" + weapon_type + ".fbx"
+	var weapon_path := WEAPON_PACK_PATH + weapon_file
 	
-	match weapon_type:
-		"shuriken1", "shuriken2", "shuriken3", "shuriken4":
-			# Shuriken - estrella plana
-			mesh_instance.mesh = CylinderMesh.new()
-			mesh_instance.mesh.top_radius = 0.15
-			mesh_instance.mesh.bottom_radius = 0.0
-			mesh_instance.mesh.height = 0.05
-			mesh_instance.rotation_degrees.x = 90
+	var loaded_model: Node3D = null
+	if ResourceLoader.exists(weapon_path):
+		var res = load(weapon_path)
+		if res:
+			loaded_model = res.instantiate()
+
+	if loaded_model:
+		# Centrar y orientar el modelo para proyectiles
+		model_container.add_child(loaded_model)
+		
+		# Escala: Multiplicada por 3 a petición del usuario (aprox 21x del base 0.008)
+		var is_small := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet"
+		var scale_val := 28.0 if is_small else 12.0 # Aumentado ligeramente para mejor visibilidad
+		loaded_model.scale = Vector3(scale_val, scale_val, scale_val)
+		
+		# Orientación base FBX -> Dirección proyectil (-Z)
+		# Sentido común: Punta hacia adelante (-Z)
+		# Shurikens: Acostados (90 grados en X) para volar como frisbi
+		if weapon_type.contains("shuriken"):
+			loaded_model.rotation_degrees = Vector3(90, 0, 0)
+		else:
+			# Kunais, Cuchillos, Bayonetas: Punta hacia adelante (-Z desde FBX +X)
+			loaded_model.rotation_degrees = Vector3(0, 90, 0)
 			
-			mat.albedo_color = _get_weapon_color()
-			mat.emission_enabled = true
-			mat.emission = mat.albedo_color * 2.0
-			
-		"kunai":
-			# Kunai - forma de cuchillo alargado
-			mesh_instance.mesh = BoxMesh.new()
-			mesh_instance.mesh.size = Vector3(0.08, 0.08, 0.5)
-			
-			mat.albedo_color = Color(0.5, 0.0, 0.8)
-			mat.emission_enabled = true
-			mat.emission = Color(0.8, 0.0, 1.0)
-			
-		"doubleAxe", "simpleAxe":
-			# Hacha - forma de doble hoja
-			mesh_instance.mesh = BoxMesh.new()
-			mesh_instance.mesh.size = Vector3(0.3, 0.1, 0.4)
-			
-			mat.albedo_color = Color(0.8, 0.2, 0.2)
-			mat.emission_enabled = true
-			mat.emission = Color(1.0, 0.3, 0.3)
-			
-			# Agregar mango
-			var handle = MeshInstance3D.new()
-			handle.mesh = CylinderMesh.new()
-			handle.mesh.radius = 0.04
-			handle.mesh.height = 0.4
-			handle.position = Vector3(0, 0, 0.3)
-			handle.rotation_degrees.x = 90
-			handle.material_override = mat
-			add_child(handle)
-	
-	mesh_instance.material_override = mat
-	
-	# Trail de partÃ­culas
+		_apply_projectile_texture(loaded_model)
+		
+		# CRITICAL FIX: Centrar el modelo escalado/rotado para que el Area3D esté en el centro real del objeto
+		# IMPORTANTE: Se multiplica por la escala y rotación del propio modelo para el ajuste exacto
+		_center_projectile_model(loaded_model)
+	else:
+		# Fallback mesh si no hay modelo (mejorado)
+		var fallback = MeshInstance3D.new()
+		fallback.mesh = BoxMesh.new()
+		fallback.mesh.size = Vector3(0.1, 0.1, 0.6)
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = _get_weapon_color()
+		mat.emission_enabled = true
+		mat.emission = mat.albedo_color * 3.0 # Más brillo para el fallback
+		fallback.material_override = mat
+		model_container.add_child(fallback)
+
+	# Trail de partículas
 	_create_trail()
+
+func _center_projectile_model(model: Node3D) -> void:
+	# Centrar el modelo para que el hitbox (Area3D) coincida con el centro visual
+	var meshes := _find_meshes(model)
+	if meshes.is_empty():
+		return
+	
+	var aabb := AABB()
+	var first := true
+	for mesh in meshes:
+		if mesh.mesh:
+			var local_aabb := mesh.mesh.get_aabb()
+			var transformed_aabb := mesh.transform * local_aabb
+			if first:
+				aabb = transformed_aabb
+				first = false
+			else:
+				aabb = aabb.merge(transformed_aabb)
+	
+	# Mover el modelo localmente para centrar el AABB
+	# BUG FIX: El desplazamiento debe tener en cuenta la escala y rotación del propio modelo
+	var center := aabb.get_center()
+	model.position = -(model.quaternion * (model.scale * center))
+
+func _apply_projectile_texture(model: Node3D) -> void:
+	var tex_path := WEAPON_PACK_PATH + "3D weapons asset pack.png"
+	if not ResourceLoader.exists(tex_path): return
+	var tex = load(tex_path)
+	
+	# Crear un único material para compartir
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.metallic = 0.2
+	mat.roughness = 0.8
+	
+	var meshes = _find_meshes(model)
+	for mesh in meshes:
+		for i in range(mesh.mesh.get_surface_count()):
+			mesh.set_surface_override_material(i, mat)
+
+func _find_meshes(node: Node) -> Array[MeshInstance3D]:
+	var result: Array[MeshInstance3D] = []
+	if node is MeshInstance3D:
+		result.append(node)
+	for child in node.get_children():
+		result.append_array(_find_meshes(child))
+	return result
 
 func _get_weapon_color() -> Color:
 	match weapon_type:
@@ -166,9 +218,18 @@ func _physics_process(delta: float) -> void:
 	# Mover proyectil
 	global_position += direction * speed * delta
 	
-	# Rotar segÃºn tipo
+	# Orientar el proyectil hacia donde vuela (PUNTA HACIA ADELANTE)
+	if direction.length() > 0.001:
+		look_at(global_position + direction, Vector3.UP)
+	
+	# Rotar según tipo (shurikens giran sobre su eje mientras vuelan)
 	if _spin_speed > 0:
-		rotate_z(deg_to_rad(_spin_speed * delta))
+		if weapon_type.contains("shuriken"):
+			# Rotación sobre el eje Y (eje vertical del shuriken acostado)
+			rotate_object_local(Vector3.UP, deg_to_rad(_spin_speed * delta))
+		else:
+			# Otros (hachas): Rotación sobre el eje lateral (Z local tras look_at)
+			rotate_object_local(Vector3.FORWARD, deg_to_rad(_spin_speed * delta))
 	
 	# Gravedad para hachas (lanzamiento pesado)
 	if _is_axe:
@@ -192,6 +253,11 @@ func _on_body_entered(body: Node3D) -> void:
 		# Marcar como daÃ±ado
 		_damaged_enemies[enemy_id] = true
 		
+		# BUG FIX: Limit dictionary size to prevent memory leak
+		if _damaged_enemies.size() > MAX_DAMAGED_TRACKED:
+			var first_key = _damaged_enemies.keys()[0]
+			_damaged_enemies.erase(first_key)
+		
 		# Aplicar daÃ±o
 		# print("DEBUG StylooProjectile: DEALING DAMAGE to ", body.name, " damage=", damage, " weapon=", weapon_type)
 		body.take_damage(damage)
@@ -199,11 +265,11 @@ func _on_body_entered(body: Node3D) -> void:
 		# Spawnear efecto de impacto
 		_spawn_impact_effect(body.global_position)
 		
-		# Comportamiento segÃºn tipo de arma
-		if weapon_type == "kunai" and _pierce_count < _max_pierce:
-			# Kunai atraviesa enemigos
+		# Comportamiento según tipo de arma
+		var is_piercing := weapon_type == "kunai" or weapon_type == "coolknife" or weapon_type == "bayonet"
+		if is_piercing and _pierce_count < _max_pierce:
+			# Atraviesa enemigos
 			_pierce_count += 1
-			# print("DEBUG StylooProjectile: kunai pierce continues, count=", _pierce_count)
 			return  # No destruir, sigue volando
 		elif _is_axe:
 			# Hacha causa daÃ±o en Ã¡rea
@@ -259,8 +325,10 @@ func _bounce_off_wall(wall: Node3D) -> void:
 	var mesh = SphereMesh.new()
 	mesh.radius = 0.04
 	particles.draw_pass_1 = mesh
-	get_tree().current_scene.add_child(particles)
-	particles.global_position = global_position
+	var scene := get_tree().current_scene
+	if scene:
+		scene.add_child(particles)
+		particles.global_position = global_position
 	
 	var timer = get_tree().create_timer(0.3)
 	timer.timeout.connect(particles.queue_free)
@@ -291,8 +359,10 @@ func _aoe_damage(center: Vector3) -> void:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	explosion.material = mat
 	
-	get_tree().current_scene.add_child(explosion)
-	explosion.global_position = center
+	var scene := get_tree().current_scene
+	if scene:
+		scene.add_child(explosion)
+		explosion.global_position = center
 	
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(explosion, "radius", radius, 0.3)
@@ -316,8 +386,10 @@ func _spawn_impact_effect(pos: Vector3) -> void:
 	var mesh = SphereMesh.new()
 	mesh.radius = 0.05
 	particles.draw_pass_1 = mesh
-	get_tree().current_scene.add_child(particles)
-	particles.global_position = pos
+	var scene := get_tree().current_scene
+	if scene:
+		scene.add_child(particles)
+		particles.global_position = pos
 	
 	var timer = get_tree().create_timer(0.5)
 	timer.timeout.connect(particles.queue_free)

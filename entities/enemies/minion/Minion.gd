@@ -88,6 +88,10 @@ func die() -> void:
 	super.die()
 
 func _death_effect() -> void:
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	
 	var burst = CSGSphere3D.new()
 	burst.radius = 0.2
 	var mat = StandardMaterial3D.new()
@@ -95,7 +99,7 @@ func _death_effect() -> void:
 	mat.emission_enabled = true
 	mat.emission = Color(0.8, 0.2, 0.0)
 	burst.material = mat
-	get_tree().current_scene.add_child(burst)
+	scene.add_child(burst)
 	burst.global_position = global_position + Vector3(0, 0.3, 0)
 	
 	var tw = create_tween().set_parallel(true)

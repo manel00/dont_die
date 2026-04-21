@@ -136,6 +136,11 @@ func _ready() -> void:
 	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	call_deferred("_spawn_effect")
 	
+	# Initialize player cache before finding target (BUG FIX: cache was empty on first use)
+	if _player_cache.is_empty():
+		var all_players := get_tree().get_nodes_in_group("player")
+		_player_cache = all_players.filter(func(p): return is_instance_valid(p))
+	
 	# Buscar target inmediatamente despuÃ©s de spawnear
 	call_deferred("_find_nearest_target")
 
@@ -144,7 +149,7 @@ func _spawn_effect() -> void:
 	if spawn_effect:
 		var effect = Node3D.new()
 		effect.set_script(spawn_effect)
-		effect.is_miniboss = (max_health > 100)  # Detectar miniboss por vida
+		effect.is_miniboss = (max_health > 100)
 		add_child(effect)
 
 func _setup_health_bar() -> void:
@@ -202,16 +207,19 @@ func _update_health_bar() -> void:
 	# Actualizamos offset X moviÃ©ndolo a la izquierda
 	_health_bar_fill.position.x = -shift
 	
-	# Colores segÃºn vida baja (amarillo/rojo) - mantener color base si > 50%
+	# Colores según vida baja (amarillo/rojo) - mantener color base si > 50%
+	var target_color: Color
 	if pct > 0.5:
 		if is_miniboss:
-			_health_bar_fill.modulate = Color(0.4, 0.9, 1.0)  # Azul celeste brillante
+			target_color = Color(0.4, 0.9, 1.0)  # Azul celeste brillante
 		else:
-			_health_bar_fill.modulate = Color(0.3, 1.0, 0.3)  # Verde brillante
+			target_color = Color(0.3, 1.0, 0.3)  # Verde brillante
 	elif pct > 0.25:
-		_health_bar_fill.modulate = Color(1.0, 1.0, 0.3)  # Amarillo (peligro medio)
+		target_color = Color(1.0, 1.0, 0.3)  # Amarillo
 	else:
-		_health_bar_fill.modulate = Color(1.0, 0.3, 0.3)  # Rojo (peligro alto)
+		target_color = Color(1.0, 0.3, 0.3)  # Rojo
+		
+	_health_bar_fill.modulate = target_color
 	
 	# Ocultar barra si estÃ¡ muerto (vida <= 0)
 	if _health_bar_bg:
@@ -235,6 +243,32 @@ func _fix_zero_scales() -> void:
 			_base_scale = Vector3(1.32, 1.32, 1.32)
 			visual.scale = _base_scale
 		_scale_initialized = true
+
+## Fix para que las barras de vida se vean por encima de los modelos mecha
+func _fix_health_bar_for_mecha() -> void:
+	if not _health_bar_bg or not _health_bar_fill:
+		return
+	
+	# Elevación estratégica: los mechas son muy altos y anchos
+	var mecha_y_offset := 6.5
+	_health_bar_bg.position.y = mecha_y_offset
+	_health_bar_fill.position.y = mecha_y_offset
+	
+	# IMPORTANTE: En Godot 4, Sprite3D tiene propiedades directas para esto
+	# Evitamos usar material_override que rompe la textura interna del Sprite3D
+	_health_bar_bg.no_depth_test = true
+	_health_bar_bg.render_priority = 100
+	
+	_health_bar_fill.no_depth_test = true
+	_health_bar_fill.render_priority = 101
+	
+	# Hacer la barra de los mechas un 50% más grande que la de los minions
+	var mecha_bar_scale_mult := 1.5
+	_health_bar_bg.scale *= mecha_bar_scale_mult
+	_health_bar_fill.scale *= mecha_bar_scale_mult
+	
+	# Forzar actualización inicial
+	_update_health_bar()
 
 func _physics_process(delta: float) -> void:
 	if current_state == State.DEAD:
@@ -533,9 +567,13 @@ func _hit_flash() -> void:
 		var tw := create_tween()
 		tw.tween_property(hit_mat, "albedo_color", Color(2.0, 0.5, 0.5), 0.05)
 		tw.tween_property(hit_mat, "albedo_color", Color.WHITE, 0.15)
+		tw.chain().tween_callback(func():
+			# BUG FIX: Restore original material - duplicated material will be auto-freed
+			mesh.material_override = original_mat
+			# Note: hit_mat is a local duplicate that auto-releases when out of scope
+		)
 
 func _hit_effect() -> void:
-	# PartÃ­culas de impacto
 	var hit_effect = load("res://entities/effects/HitEffect.gd")
 	if hit_effect:
 		var effect = Node3D.new()
@@ -594,24 +632,22 @@ func die() -> void:
 	queue_free()
 
 func _death_effect() -> void:
+	# FIX: Use the existing GDScript approach (effects are .gd files, not .tscn)
 	var death_effect = load("res://entities/effects/DeathEffect.gd")
 	if death_effect:
 		var effect = Node3D.new()
 		effect.set_script(death_effect)
-		# Detectar tipo por nombre o vida
 		if max_health > 150:
 			effect.enemy_type = "mage"
 		elif max_health > 100:
 			effect.enemy_type = "rogue"
 		else:
 			effect.enemy_type = "minion"
-		# Safety: get_tree() or current_scene might be null during scene changes
 		var tree := get_tree()
 		if tree and tree.current_scene:
 			tree.current_scene.add_child(effect)
 			effect.global_position = global_position
 		else:
-			# Fallback: add to this enemy's parent temporarily
 			if get_parent():
 				get_parent().add_child(effect)
 				effect.global_position = global_position
@@ -687,6 +723,9 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 		mecha_node.position = Vector3(0, 0, 0)
 		# Rotar si estÃ¡ de espaldas (Godot mira hacia Z-)
 		mecha_node.rotation_degrees = Vector3(0, 180, 0)
+		
+		# Fix: Asegurar que la barra de vida se vea por encima del modelo mecha
+		_fix_health_bar_for_mecha()
 
 func _animate_visuals(delta: float) -> void:
 	# Escala fija - no permitir cambios dinÃ¡micos de tamaÃ±o
