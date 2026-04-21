@@ -41,7 +41,7 @@ const STYLOO_WEAPONS := {
 	"kunai": {
 		"file": "ASSETS.fbx_kunai.fbx",
 		"scale": Vector3(0.04, 0.04, 0.04),
-		"rotation": Vector3(0, 45, 45),
+		"rotation": Vector3(0, 90, 0),
 		"cooldown": 0.2, "damage": 28, "range": 2.0,
 		"color": Color(0.5, 0.0, 0.8, 1.0),
 		"type": "ranged"
@@ -165,10 +165,9 @@ func _ready() -> void:
 func _build_visual() -> void:
 	# ─── CONTENEDOR VISUAL ────────────────────────────────────────────
 	# Este es el único nodo que se mueve (rota + bob).
-	# El nodo raíz (Area3D) NUNCA se mueve — su posición es la del pickup.
 	var visual := Node3D.new()
 	visual.name = "WeaponVisual"
-	visual.position = Vector3(0.0, 0.3, 0.0)  # elevado sobre el suelo
+	visual.position = Vector3(0.0, 0.7, 0.0)  # elevado sobre el suelo (0.7m)
 	add_child(visual)
 
 	# ─── MODELO 3D ────────────────────────────────────────────────────
@@ -181,38 +180,33 @@ func _build_visual() -> void:
 			loaded_model = res.instantiate()
 
 	if loaded_model:
-		# Detectar si es objeto pequeño (shuriken, kunai, cuchillo, bayoneta, hacha) para escala aumentada
 		var is_small_weapon := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet" or weapon_type.contains("Axe") or weapon_type == "pickaxe"
 		var scale_multiplier := 900.0 if is_small_weapon else 300.0
 		
-		# IMPORTANTE: Aplicar escala y rotación ANTES de centrar
-		# De lo contrario, el offset original se magnifica erróneamente
 		loaded_model.scale = _weapon_data.scale * scale_multiplier
 		loaded_model.rotation_degrees = _weapon_data.rotation
 		_apply_texture(loaded_model)
-		
-		# Ahora centramos el modelo escalado y rotado relativo a su contenedor
 		_center_model(loaded_model)
-		
 		visual.add_child(loaded_model)
-		# Sincronizar posición visual exacta con la esfera de debug (0, 0.3, 0)
-		visual.position = Vector3(0, 0.3, 0)
 	else:
-		# Fallback geométrico si no hay .fbx disponible
 		visual.add_child(_make_fallback_mesh())
 
 	# ─── LUZ ──────────────────────────────────────────────────────────
 	var light := OmniLight3D.new()
 	light.light_color = _weapon_data.get("color", Color.WHITE) as Color
-	light.light_energy = 2.0  # Reducido para no tapar el arma
+	light.light_energy = 1.5
 	light.omni_range = 3.0
-	light.omni_attenuation = 1.0
-	light.position = Vector3(0, 0.5, 0)  # Encima del arma
-	light.shadow_enabled = false
+	light.position = Vector3(0, 0.5, 0)
 	add_child(light)
 
 	# ─── ANIMACIÓN ────────────────────────────────────────────────────
-	# Armas estáticas en el suelo (sin animación)
+	# Hacer que el arma flote y rote para que se vea premium y NUNCA toque el suelo
+	var tw = visual.create_tween().set_loops()
+	tw.tween_property(visual, "position:y", 0.9, 1.2).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(visual, "position:y", 0.7, 1.2).set_trans(Tween.TRANS_SINE)
+	
+	var tw_rot = visual.create_tween().set_loops()
+	tw_rot.tween_property(visual, "rotation:y", TAU, 3.0).as_relative()
 
 func _apply_texture(model: Node3D) -> void:
 	var tex_path := WEAPON_PACK_PATH + "3D weapons asset pack.png"

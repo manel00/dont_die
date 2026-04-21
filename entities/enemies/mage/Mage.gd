@@ -1,4 +1,4 @@
-﻿extends EnemyBase
+extends EnemyBase
 
 ## Mage â€” usa Skeleton_Mage.glb (KayKit Skeletons)
 ## MINIBOSS: Ataque a distancia con proyectiles elementales (hielo, fuego, electric)
@@ -27,7 +27,7 @@ func _ready() -> void:
 	_find_anim_player()
 	_setup_staff_visual()
 	_setup_glow()
-	_apply_random_mecha_texture()  # MINIBOSS: Textura mecha aleatoria
+	_apply_random_mecha_texture()  # MINIBOSS: Mantener identidad visual aunque el Base ya limpie doble carga
 
 func _setup_glow() -> void:
 	# Add glow light to make miniboss stand out

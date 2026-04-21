@@ -240,8 +240,9 @@ func _fix_health_bar_for_mecha() -> void:
 	
 	# IMPORTANTE: En Godot 4, Sprite3D tiene propiedades directas para esto
 	# Evitamos usar material_override que rompe la textura interna del Sprite3D
-	_health_bar_fill.no_depth_test = true
-	_health_bar_fill.render_priority = 101
+	_health_bar_fill.no_depth_test = false # Sentido común: si el mecha es físico, no debe ser atravesado por la barra
+	_health_bar_fill.render_priority = 5 # Prioridad baja para que respete el depth del mundo
+	_health_bar_fill.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	
 	# Hacer la barra de los mechas un 50% más grande que la de los minions
 	var mecha_bar_scale_mult := 1.5
@@ -643,13 +644,12 @@ func _ensure_materials_loaded() -> void:
 		if tex and model:
 			_mecha_textures.append(tex)
 			_mecha_model_assets.append(model)
-			# Crear material compartido
+			# Crear material compartido TOTALMENTE SÓLIDO
 			var mat := StandardMaterial3D.new()
 			mat.albedo_texture = tex
-			mat.emission_enabled = true
-			mat.emission = Color(0.2, 0.2, 0.2)
-			mat.emission_energy_multiplier = 0.5
-			# Mallas sÃ³lidas, quitamos holograma
+			mat.emission_enabled = false # Sin brillos raros que parezcan hologramas
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 			_mecha_materials.append(mat)
 	
 	_materials_loaded = true
@@ -665,18 +665,24 @@ func _apply_random_mecha_texture() -> void:
 	_apply_mecha_texture_by_index(idx)
 
 func _apply_mecha_texture_by_index(index: int) -> void:
-	"""Aplica un modelo mecha especÃ­fico por Ã­ndice."""
+	"""Aplica un modelo mecha específico por índice."""
 	_ensure_materials_loaded()
-	
-	if index < 0 or index >= _mecha_materials.size():
-		_apply_random_mecha_texture()
-		return
 	
 	var visual := _visual_model
 	if not visual:
 		return
+		
+	if index < 0 or index >= _mecha_materials.size():
+		_apply_random_mecha_texture()
+		return
 	
-	# Ocultar todos los mesh de los esqueletos en el skeleton3d existente
+	# 1. Limpieza total: eliminar CUALQUIER modelo mecha previo para evitar Z-fighting (textura que aparece/desaparece)
+	var old_mecha = visual.get_node_or_null("MechaModel")
+	if old_mecha:
+		old_mecha.queue_free()
+		visual.remove_child(old_mecha)
+	
+	# 2. Ocultar todos los mesh de los esqueletos originales (Skeleton_Rogue, etc.)
 	for child in visual.find_children("*", "MeshInstance3D", true, false):
 		child.hide()
 	
@@ -690,21 +696,28 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 		mecha_node.mesh = res
 		
 	if mecha_node:
+		mecha_node.name = "MechaModel"
 		visual.add_child(mecha_node)
-		# Aplicar el material adecuado a TODAS las superficies para evitar errores de material null
+		
+		# 3. Aplicar material SÓLIDO y OPACO (sentido común: los robots no son fantasmas)
+		var material = _mecha_materials[index]
+		material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		
 		if mecha_node is MeshInstance3D:
 			for i in range(mecha_node.mesh.get_surface_count()):
-				mecha_node.set_surface_override_material(i, _mecha_materials[index])
+				mecha_node.set_surface_override_material(i, material)
 		else:
 			for mi in mecha_node.find_children("*", "MeshInstance3D", true, false):
 				if mi.mesh:
 					for i in range(mi.mesh.get_surface_count()):
-						mi.set_surface_override_material(i, _mecha_materials[index])
+						mi.set_surface_override_material(i, material)
 				
-		# Ajustar escala a su tamaño natural de Godot (1.0)
+		# 4. Ajustar escala y posición
 		mecha_node.scale = Vector3(1.0, 1.0, 1.0)
 		mecha_node.position = Vector3(0, 0, 0)
-		# Rotar si estÃ¡ de espaldas (Godot mira hacia Z-)
+		# Rotar si está de espaldas (Godot mira hacia Z-)
 		mecha_node.rotation_degrees = Vector3(0, 180, 0)
 		
 		# Fix: Asegurar que la barra de vida se vea por encima del modelo mecha

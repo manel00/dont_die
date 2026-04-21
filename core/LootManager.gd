@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 
 ## LootManager (Autoload)
 ## Spawnea armas cerca del jugador para que siempre haya disponibles.
@@ -39,14 +39,21 @@ func _spawn_initial_weapons_near_player() -> void:
 	var player = players[0] # Primer jugador
 	var player_pos = player.global_position
 	
-	# Spawnear 8 armas alrededor del jugador, muy cerca (3-8 unidades)
-	for i in range(8):
-		var angle = (TAU / 8.0) * i + randf_range(-0.3, 0.3) # Distribuidas en círculo con variación
-		var dist = randf_range(3.0, 8.0)
+	# Spawnear armas distribuidas, respetando la distancia de 30m entre ellas
+	# Para que 8 armas estén a 30m entre sí en un círculo, el radio debe ser ~40m
+	var spawned_count = 0
+	var attempts = 0
+	while spawned_count < 8 and attempts < 100:
+		attempts += 1
+		var angle = randf() * TAU
+		var dist = randf_range(3.0, 50.0) # Buscamos en un radio más amplio
 		var pos = player_pos + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
-		_spawn_weapon_pickup.call_deferred(pos, WEAPON_TYPES[i % WEAPON_TYPES.size()])
+		
+		if not _is_too_close(pos, 30.0):
+			_spawn_weapon_pickup.call_deferred(pos, WEAPON_TYPES[spawned_count % WEAPON_TYPES.size()])
+			spawned_count += 1
 	
-	print("LootManager: Spawned 8 weapons near player at ", player_pos)
+	print("LootManager: Spawned ", spawned_count, " initial weapons (min 30m distance)")
 
 func _on_weapon_spawn_timer() -> void:
 	if not multiplayer.is_server(): return
@@ -54,27 +61,40 @@ func _on_weapon_spawn_timer() -> void:
 	var players = get_tree().get_nodes_in_group("player")
 	if players.is_empty(): return
 	
-	# Spawnear 2-3 armas cerca del jugador
+	# Intentar spawnear 1 arma nueva si hay sitio
 	var player = players.pick_random()
 	var player_pos = player.global_position
 	
-	for i in range(randi() % 2 + 2): # 2 o 3 armas
+	for attempt in range(10): # 10 intentos para encontrar un sitio libre
 		var angle = randf() * TAU
-		var dist = randf_range(4.0, 10.0) # Cerca pero no encima
+		var dist = randf_range(20.0, 60.0) # Más lejos para encontrar hueco
 		var pos = player_pos + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
-		_spawn_weapon_pickup(pos)
+		
+		if not _is_too_close(pos, 30.0):
+			_spawn_weapon_pickup(pos)
+			break
 
-func try_drop_loot(position: Vector3) -> void:
+func try_drop_loot(pos: Vector3) -> void:
 	if not multiplayer.is_server(): return
 	
 	var r = randf()
 	if r <= 0.10:
-		rpc("_spawn_loot", position)
+		rpc("_spawn_loot", pos)
 	elif r <= 0.20:
-		rpc("_spawn_weapon_pickup", position)
+		# Solo spawnear arma si no hay otra a 30m
+		if not _is_too_close(pos, 30.0):
+			rpc("_spawn_weapon_pickup", pos)
+
+func _is_too_close(pos: Vector3, min_dist: float) -> bool:
+	var pickups = get_tree().get_nodes_in_group("styloo_pickups")
+	for p in pickups:
+		if p is Node3D:
+			if p.global_position.distance_to(pos) < min_dist:
+				return true
+	return false
 
 @rpc("authority", "call_local")
-func _spawn_weapon_pickup(position: Vector3, specific_weapon: String = "") -> void:
+func _spawn_weapon_pickup(pos: Vector3, specific_weapon: String = "") -> void:
 	if not weapon_pickup_scene: return
 	var tree := get_tree()
 	if not tree or not tree.current_scene: return
@@ -87,13 +107,13 @@ func _spawn_weapon_pickup(position: Vector3, specific_weapon: String = "") -> vo
 		instance.weapon_type = specific_weapon
 	
 	tree.current_scene.add_child(instance)
-	instance.global_position = position + Vector3(0, 0.05, 0) # Apenas elevado del suelo
+	instance.global_position = pos + Vector3(0, 0.05, 0) # Apenas elevado del suelo
 
 @rpc("authority", "call_local")
-func _spawn_loot(position: Vector3) -> void:
+func _spawn_loot(pos: Vector3) -> void:
 	if not loot_item_scene: return
 	var tree := get_tree()
 	if not tree or not tree.current_scene: return
 	var loot = loot_item_scene.instantiate()
 	tree.current_scene.add_child(loot)
-	loot.global_position = position + Vector3(0, 0.5, 0)
+	loot.global_position = pos + Vector3(0, 0.5, 0)
