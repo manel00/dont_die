@@ -24,6 +24,7 @@ var _health_bar_bg: Sprite3D  # Fondo negro para mejor contraste
 
 enum State { IDLE, CHASE, ATTACK, DEAD, STRAFE, RETREAT }
 var current_state: State = State.IDLE
+var _is_mecha_active: bool = false
 
 @onready var _visual_model: Node3D = get_node_or_null("VisualModel")
 var _base_scale: Vector3 = Vector3.ONE
@@ -183,21 +184,25 @@ func _update_health_bar() -> void:
 	
 	var is_miniboss := max_health > 100
 	var bar_width := 6.0 if is_miniboss else 5.0  # Escala base
+	var bar_height := 9.0 if is_miniboss else 7.5
+	
+	# Si es un mecha, aplicamos el multiplicador de tamaño
+	if _is_mecha_active:
+		bar_width *= 2.0
+		bar_height *= 2.0
 	
 	var pct = clamp(float(current_health) / max_health, 0.001, 1.0)
 	
-	# Escalar ancho segÃºn vida (la barra de color se reduce)
+	# Escalar ancho según vida (la barra de color se reduce)
 	# BUG FIX: Nunca usar escala 0 para evitar errores de determinante 0 en el renderizador
 	_health_bar_fill.scale.x = bar_width * pct
+	_health_bar_fill.scale.y = bar_height
 	
 	# Alinear a la izquierda (empezar desde el borde izquierdo del fondo)
-	# Desplazamiento = Mitad de la diferencia visual de escala total
-	# Ancho total visual del BG = 64 pÃ­xeles * pixel_size * bar_width
 	var tex_width: float = 64.0
 	var total_w = tex_width * _health_bar_fill.pixel_size * bar_width
 	var current_w = tex_width * _health_bar_fill.pixel_size * (bar_width * pct)
 	var shift = (total_w - current_w) / 2.0
-	# Actualizamos offset X moviÃ©ndolo a la izquierda
 	_health_bar_fill.position.x = -shift
 	
 	# Colores según vida (unificado a VERDE por petición del usuario)
@@ -232,22 +237,28 @@ func _fix_zero_scales() -> void:
 
 ## Fix para que las barras de vida se vean por encima de los modelos mecha
 func _fix_health_bar_for_mecha() -> void:
-	if not _health_bar_bg or not _health_bar_fill:
+	if not _health_bar_fill:
 		return
 	
 	# Elevación estratégica: los mechas son muy altos y anchos
-	var mecha_y_offset := 8.5
+	# Aumentamos a 10.5 para asegurar que esté por encima de la cabeza
+	var mecha_y_offset := 10.5
 	_health_bar_fill.position.y = mecha_y_offset
 	
-	# IMPORTANTE: En Godot 4, Sprite3D tiene propiedades directas para esto
-	# Evitamos usar material_override que rompe la textura interna del Sprite3D
-	_health_bar_fill.no_depth_test = false # Sentido común: si el mecha es físico, no debe ser atravesado por la barra
-	_health_bar_fill.render_priority = 5 # Prioridad baja para que respete el depth del mundo
+	# "SIEMPRE VISIBLE": Activamos no_depth_test y prioridad alta
+	# Esto cumple con la petición de que esté "siempre visible" y "encima de la textura"
+	_health_bar_fill.no_depth_test = true
+	_health_bar_fill.render_priority = 10
 	_health_bar_fill.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	
-	# Hacer la barra de los mechas un 50% más grande que la de los minions
-	var mecha_bar_scale_mult := 1.5
-	_health_bar_fill.scale *= mecha_bar_scale_mult
+	# Hacer la barra de los mechas el doble de grande que la de los minions para que destaque
+	var mecha_bar_scale_mult := 2.0
+	_health_bar_fill.scale = Vector3(
+		(6.0 if max_health > 100 else 5.0) * mecha_bar_scale_mult,
+		(9.0 if max_health > 100 else 7.5) * mecha_bar_scale_mult,
+		1.0
+	)
+	_is_mecha_active = true
 	
 	# Forzar actualización inicial
 	_update_health_bar()
