@@ -210,18 +210,20 @@ func _build_visual() -> void:
 
 func _apply_texture(model: Node3D) -> void:
 	var tex_path := WEAPON_PACK_PATH + "3D weapons asset pack.png"
-	if not ResourceLoader.exists(tex_path):
-		return
-	var tex: Texture2D = load(tex_path)
-	if not tex:
-		return
+	var tex: Texture2D = null
+	if ResourceLoader.exists(tex_path):
+		tex = load(tex_path)
 		
 	# Crear un único material para compartir entre mallas
 	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = tex
-	mat.albedo_color = Color.WHITE
-	mat.metallic = 0.2
-	mat.roughness = 0.8  # Menos brillo para que se vea mejor la textura
+	if tex:
+		mat.albedo_texture = tex
+		mat.albedo_color = Color.WHITE
+	else:
+		mat.albedo_color = _weapon_data.get("color", Color.WHITE)
+		
+	mat.metallic = 0.4
+	mat.roughness = 0.6
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	
 	for mesh in _find_meshes(model):
@@ -299,18 +301,20 @@ func _on_body_entered(body: Node3D) -> void:
 	
 	if body.is_in_group("player"):
 		if body.has_method("pickup_styloo_weapon"):
-			# ÚNICO DEBUG PERMITIDO: Informar del arma recogida
-			print("WEAPON PICKED UP: ", weapon_type)
+			var success: bool = body.pickup_styloo_weapon(weapon_type, _weapon_data)
 			
-			body.pickup_styloo_weapon(weapon_type, _weapon_data)
-			# Destruir pickup — FIX: authority check before RPC
-			if multiplayer.is_server() or not multiplayer.has_multiplayer_peer():
-				if multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
-					rpc_destroy.rpc()
+			if success:
+				# ÚNICO DEBUG PERMITIDO: Informar del arma recogida
+				print("WEAPON PICKED UP: ", weapon_type)
+				
+				# Destruir pickup — FIX: authority check before RPC
+				if multiplayer.is_server() or not multiplayer.has_multiplayer_peer():
+					if multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
+						rpc_destroy.rpc()
+					else:
+						queue_free()
 				else:
-					queue_free()
-			else:
-				rpc_destroy.rpc_id(1)
+					rpc_destroy.rpc_id(1)
 
 @rpc("authority", "call_local")
 func rpc_destroy() -> void:
@@ -320,7 +324,8 @@ func _fade_and_die() -> void:
 	if not is_inside_tree():
 		return
 	var tw := create_tween()
-	tw.tween_property(self, "scale", Vector3.ZERO, 0.4)
+	# BUG FIX: Nunca escalar exactamente a ZERO para evitar errores de matriz no invertible (det == 0)
+	tw.tween_property(self, "scale", Vector3(0.001, 0.001, 0.001), 0.4)
 	tw.tween_callback(queue_free)
 
 static func get_random_weapon_type() -> String:

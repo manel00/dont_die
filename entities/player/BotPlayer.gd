@@ -621,11 +621,12 @@ func rpc_spawn_bot_projectile(pos: Vector3, dir: Vector3) -> void:
 
 # INTELIGENCIA AUTÃ“NOMA: Los bots recogen botÃ­n para hacerse mÃ¡s fuertes
 @warning_ignore("unused_parameter")
-func pickup_styloo_weapon(_weapon_name: String, _data: Dictionary) -> void:
+func pickup_styloo_weapon(_weapon_name: String, _data: Dictionary) -> bool:
 	# El bot se hace más poderoso en lugar de cambiar de modelo complejo
 	max_health += 50
 	current_health = max_health
 	fire_rate = max(0.1, fire_rate - 0.05)
+	return true
 
 func pickup_weapon(weapon_type: String) -> void:
 	pickup_styloo_weapon(weapon_type, {})

@@ -62,12 +62,12 @@ func _setup_weapon_behavior() -> void:
 			_spin_speed = 0  # No rota, vuela recto (apunta con la punta)
 			
 		"doubleAxe", "simpleAxe":
-			# Hachas: Lento pero devastador, daÃ±o en Ã¡rea
-			speed = 18.0
-			damage = 70
-			life_time = 4.0
+			# Hachas: Ahora se lanzan como shurikens (rápido, recto, giro rápido)
+			speed = 35.0
+			damage = 65
+			life_time = 3.5
 			_max_pierce = 0
-			_spin_speed = 360.0  # Gira lentamente
+			_spin_speed = 800.0  # Giro rápido de hacha
 			_is_axe = true
 	
 	# Crear mesh visual usando el modelo real del arma
@@ -154,14 +154,20 @@ func _center_projectile_model(model: Node3D) -> void:
 
 func _apply_projectile_texture(model: Node3D) -> void:
 	var tex_path := WEAPON_PACK_PATH + "3D weapons asset pack.png"
-	if not ResourceLoader.exists(tex_path): return
-	var tex = load(tex_path)
+	var tex = null
+	if ResourceLoader.exists(tex_path):
+		tex = load(tex_path)
 	
 	# Crear un único material para compartir
 	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = tex
-	mat.metallic = 0.2
-	mat.roughness = 0.8
+	if tex:
+		mat.albedo_texture = tex
+	else:
+		# Fallback color si no hay textura para evitar errores de material nulo
+		mat.albedo_color = _get_weapon_color()
+	
+	mat.metallic = 0.5
+	mat.roughness = 0.4
 	
 	var meshes = _find_meshes(model)
 	for mesh in meshes:
@@ -238,13 +244,14 @@ func _physics_process(delta: float) -> void:
 			# Rotación sobre el eje Y (eje vertical del shuriken acostado)
 			rotate_object_local(Vector3.UP, deg_to_rad(_spin_speed * delta))
 		else:
-			# Otros (hachas): Rotación sobre el eje lateral (Z local tras look_at)
-			rotate_object_local(Vector3.FORWARD, deg_to_rad(_spin_speed * delta))
+			# Otros (hachas): Rotación somersault sobre el eje lateral (X local)
+			# IMPORTANTE: Usar Vector3.RIGHT para que gire como hacha lanzada
+			rotate_object_local(Vector3.RIGHT, deg_to_rad(_spin_speed * delta))
 	
-	# Gravedad para hachas (lanzamiento pesado)
-	if _is_axe:
-		direction.y -= 2.0 * delta  # CaÃ­da lenta
-		direction = direction.normalized()
+	# Gravedad desactivada para hachas si se lanzan como shurikens (recto)
+	# if _is_axe:
+	# 	direction.y -= 2.0 * delta
+	# 	direction = direction.normalized()
 
 func _on_body_entered(body: Node3D) -> void:
 	# DEBUG: Log todas las colisiones
@@ -281,12 +288,8 @@ func _on_body_entered(body: Node3D) -> void:
 			# Atraviesa enemigos
 			_pierce_count += 1
 			return  # No destruir, sigue volando
-		elif _is_axe:
-			# Hacha causa daÃ±o en Ã¡rea
-			_aoe_damage(body.global_position)
-			queue_free()
 		else:
-			# Shurikens y otros se destruyen al impactar
+			# Shurikens, hachas (estilo shuriken) y otros se destruyen al impactar
 			queue_free()
 			
 	elif body.is_in_group("enemies") or body.is_in_group("player"):
@@ -295,8 +298,8 @@ func _on_body_entered(body: Node3D) -> void:
 		
 	else:
 		# GolpeÃ³ ambiente (pared, suelo, etc)
-		if weapon_type.begins_with("shuriken"):
-			# Shurikens rebotan en paredes
+		if weapon_type.contains("shuriken") or _is_axe:
+			# Shurikens y hachas rebotan en paredes
 			_bounce_off_wall(body)
 		else:
 			# Otros se destruyen
@@ -374,7 +377,8 @@ func _aoe_damage(center: Vector3) -> void:
 		scene.add_child(explosion)
 		explosion.global_position = center
 	
-	var tw = create_tween().set_parallel(true)
+	# Efecto visual de explosión (FIX: usar tween del propio nodo explosion o del tree)
+	var tw = explosion.create_tween().set_parallel(true)
 	tw.tween_property(explosion, "radius", radius, 0.3)
 	tw.tween_property(mat, "albedo_color:a", 0.0, 0.3)
 	tw.chain().tween_callback(explosion.queue_free)

@@ -890,11 +890,11 @@ func pickup_weapon(_weapon_type: String = "sword") -> void:
 	# Legacy weapon pickup - convertir a styloo
 	pickup_styloo_weapon("sword1", {})
 
-func pickup_styloo_weapon(weapon_type: String, weapon_data: Dictionary) -> void:
+func pickup_styloo_weapon(weapon_type: String, weapon_data: Dictionary) -> bool:
 	# BUG FIX: No permitir recoger arma si ya tiene una equipada (según regla del proyecto)
 	if has_weapon:
-		print("PlayerController: Cannot pickup weapon, already have one equipped. Drop first with Q")
-		return
+		# print("PlayerController: Cannot pickup weapon, already have one equipped. Drop first with Q")
+		return false
 
 	has_weapon = true
 	_current_styloo_weapon = weapon_type
@@ -929,6 +929,8 @@ func pickup_styloo_weapon(weapon_type: String, weapon_data: Dictionary) -> void:
 	var am = get_node_or_null("/root/AudioManager")
 	if am and am.has_method("play_level_up"):
 		am.play_level_up()
+		
+	return true
 
 func _setup_styloo_weapon_visual() -> void:
 	if not visual_model:

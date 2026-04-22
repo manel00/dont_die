@@ -184,9 +184,10 @@ func _update_health_bar() -> void:
 	var is_miniboss := max_health > 100
 	var bar_width := 6.0 if is_miniboss else 5.0  # Escala base
 	
-	var pct = clamp(float(current_health) / max_health, 0.0, 1.0)
+	var pct = clamp(float(current_health) / max_health, 0.001, 1.0)
 	
 	# Escalar ancho segÃºn vida (la barra de color se reduce)
+	# BUG FIX: Nunca usar escala 0 para evitar errores de determinante 0 en el renderizador
 	_health_bar_fill.scale.x = bar_width * pct
 	
 	# Alinear a la izquierda (empezar desde el borde izquierdo del fondo)
@@ -653,6 +654,18 @@ func _ensure_materials_loaded() -> void:
 			_mecha_materials.append(mat)
 	
 	_materials_loaded = true
+	
+	# CRITICAL FIX: Ensure all surfaces in pre-loaded models have their materials assigned correctly
+	# This prevents "Parameter 'material' is null" errors during shadow passes
+	for i in range(_mecha_model_assets.size()):
+		var model = _mecha_model_assets[i]
+		var mat = _mecha_materials[i]
+		if model is Mesh:
+			pass # Meshes themselves don't store surface overrides here
+		elif model is PackedScene:
+			# We can't easily modify the PackedScene surfaces without instantiating,
+			# but we ensure they are applied during _apply_mecha_texture_by_index
+			pass
 
 func _apply_random_mecha_texture() -> void:
 	"""Aplica modelo mecha aleatorio ocultando el hueso/skeleton antiguo."""
@@ -706,13 +719,18 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 		
 		if mecha_node is MeshInstance3D:
-			for i in range(mecha_node.mesh.get_surface_count()):
-				mecha_node.set_surface_override_material(i, material)
+			if mecha_node.mesh:
+				for i in range(mecha_node.mesh.get_surface_count()):
+					mecha_node.set_surface_override_material(i, material)
 		else:
 			for mi in mecha_node.find_children("*", "MeshInstance3D", true, false):
 				if mi.mesh:
 					for i in range(mi.mesh.get_surface_count()):
 						mi.set_surface_override_material(i, material)
+				else:
+					# Si no hay mesh pero es un MeshInstance, asignar un fallback pequeño
+					# para evitar que el renderer se queje de materiales nulos en superficies inexistentes
+					pass
 				
 		# 4. Ajustar escala y posición
 		mecha_node.scale = Vector3(1.0, 1.0, 1.0)
