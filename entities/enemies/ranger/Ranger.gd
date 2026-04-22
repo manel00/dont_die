@@ -2,8 +2,7 @@ extends EnemyBase
 
 ## Ranger â€” usa Skeleton_Rogue.glb (KayKit Skeletons) + Crossbow
 
-var attack_cooldown: float = 1.8
-var _attack_timer: float = 0.0
+# El attack_cooldown ahora se hereda de EnemyBase
 var projectile_scene := preload("res://entities/player/weapons/Projectile.tscn")
 
 var _anim_player: AnimationPlayer = null
@@ -13,13 +12,13 @@ const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
 	super._ready()
-	attack_range = 18.0  # Mayor rango
+	attack_range = 54.0  # Triple de rango (18.0 * 3)
 	move_speed = 1.4  # 80% mÃ¡s lento
 	max_health = 180  # +50% mÃ¡s vida
 	current_health = max_health
 	attack_damage = 30  # +100% mÃ¡s daÃ±o
 	score_value = 60  # +50% mÃ¡s puntos
-	attack_cooldown = 0.7  # Alta cadencia — mecha agresivo
+	attack_cooldown = 1.0  # Disparar cada segundo sin parar (petición usuario)
 	_find_anim_player()
 	
 	# Attach Crossbow to hand (procedural for now, or just ensure it's in the scene)
@@ -59,10 +58,6 @@ func _load_animations(_anim_path := "") -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
-	
-	if current_state == State.ATTACK:
-		_attack_timer -= delta
-	
 	_update_animation()
 
 func _update_animation() -> void:
@@ -87,10 +82,8 @@ func _perform_attack() -> void:
 	var dir := global_position.direction_to(target.global_position)
 	var move_dir := Vector3(dir.x, 0, dir.z).normalized()
 	rotation.y = atan2(move_dir.x, move_dir.z)
-
-	if _attack_timer <= 0.0:
-		_attack_timer = attack_cooldown
-		_shoot_electric_bolt(move_dir)
+	
+	_shoot_electric_bolt(move_dir)
 
 ## Dispara un bolt eléctrico amarillo de alta cadencia.
 func _shoot_electric_bolt(move_dir: Vector3) -> void:

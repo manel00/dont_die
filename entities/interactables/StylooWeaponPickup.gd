@@ -18,7 +18,7 @@ const STYLOO_WEAPONS := {
 	"coolknife": {
 		"file": "ASSETS.fbx_coolknife.fbx",
 		"scale": Vector3(0.03, 0.03, 0.03),
-		"rotation": Vector3(0, 90, 0),
+		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.25, "damage": 30, "range": 2.5,
 		"color": Color(0.2, 0.8, 1.0, 1.0),
 		"type": "ranged"
@@ -34,14 +34,14 @@ const STYLOO_WEAPONS := {
 	"katana": {
 		"file": "ASSETS.fbx_katana.fbx",
 		"scale": Vector3(0.015, 0.015, 0.015),
-		"rotation": Vector3(0, 90, 0),
+		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.35, "damage": 45, "range": 3.5,
 		"color": Color(1.0, 0.0, 0.5, 1.0)
 	},
 	"kunai": {
 		"file": "ASSETS.fbx_kunai.fbx",
 		"scale": Vector3(0.04, 0.04, 0.04),
-		"rotation": Vector3(0, 90, 0),
+		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.2, "damage": 28, "range": 2.0,
 		"color": Color(0.5, 0.0, 0.8, 1.0),
 		"type": "ranged"
@@ -49,14 +49,14 @@ const STYLOO_WEAPONS := {
 	"longsword": {
 		"file": "ASSETS.fbx_longsword.fbx",
 		"scale": Vector3(0.015, 0.015, 0.015),
-		"rotation": Vector3(0, 90, 0),
+		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.45, "damage": 50, "range": 4.5,
 		"color": Color(0.9, 0.9, 1.0, 1.0)
 	},
 	"normalsword": {
 		"file": "ASSETS.fbx_normalsword.fbx",
 		"scale": Vector3(0.015, 0.015, 0.015),
-		"rotation": Vector3(0, 90, 0),
+		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.35, "damage": 40, "range": 3.0,
 		"color": Color(0.6, 0.6, 0.7, 1.0)
 	},
@@ -110,7 +110,7 @@ const STYLOO_WEAPONS := {
 	"sword1": {
 		"file": "ASSETS.fbx_sword1.fbx",
 		"scale": Vector3(0.015, 0.015, 0.015),
-		"rotation": Vector3(0, 90, 0),
+		"rotation": Vector3(0, 90, 90),
 		"cooldown": 0.35, "damage": 42, "range": 3.2,
 		"color": Color(0.3, 0.8, 1.0, 1.0)
 	}
@@ -157,10 +157,8 @@ func _ready() -> void:
 	# para que el nodo esté completamente en el árbol antes
 	call_deferred("_build_visual")
 
-	# Timer de despawn - siempre en servidor
-	if multiplayer.is_server():
-		var t := get_tree().create_timer(DESPAWN_TIME)
-		t.timeout.connect(_fade_and_die)
+	# Timer de despawn REMOVIDO de _ready para evitar que armas naturales desaparezcan.
+	# Solo se gestionará en _process si _is_dropped == true.
 
 func _build_visual() -> void:
 	# ─── CONTENEDOR VISUAL ────────────────────────────────────────────
@@ -181,7 +179,7 @@ func _build_visual() -> void:
 
 	if loaded_model:
 		var is_small_weapon := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet" or weapon_type.contains("Axe") or weapon_type == "pickaxe"
-		var scale_multiplier := 900.0 if is_small_weapon else 300.0
+		var scale_multiplier := 450.0 if is_small_weapon else 300.0
 		
 		loaded_model.scale = _weapon_data.scale * scale_multiplier
 		loaded_model.rotation_degrees = _weapon_data.rotation
@@ -283,9 +281,8 @@ func _make_fallback_mesh() -> MeshInstance3D:
 
 func _process(delta: float) -> void:
 	if _is_dropped:
-		# FIX: Use class member, not local variable (was shadowing and breaking despawn)
 		_despawn_timer += delta
-		if _despawn_timer >= 5.0:
+		if _despawn_timer >= DESPAWN_TIME:
 			_fade_and_die()
 
 func _on_body_entered(body: Node3D) -> void:

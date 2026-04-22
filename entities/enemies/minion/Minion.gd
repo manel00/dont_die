@@ -1,4 +1,4 @@
-﻿extends EnemyBase
+extends EnemyBase
 
 ## Minion â€” usa Skeleton_Minion.glb (KayKit Skeletons)
 ## Enemigo dÃ©bil pero numeroso, ataca en grupo
@@ -11,7 +11,7 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 2.0
-	move_speed = 3.2  # 80% mÃ¡s lento
+	move_speed = 3.84  # +20% (3.2 * 1.2)
 	attack_damage = 15  # +87% mÃ¡s daÃ±o
 	max_health = 120   # +50% mÃ¡s resistente
 	current_health = 120

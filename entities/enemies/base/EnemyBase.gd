@@ -3,10 +3,11 @@ extends CharacterBody3D
 
 @export_category("Enemy Stats")
 @export var max_health: int = 450  # +50% mÃ¡s vida
-@export var move_speed: float = 6.24  # +50% from original 4.0
+@export var move_speed: float = 7.5  # +20% (6.24 * 1.2)
 @export var attack_damage: int = 30  # +50% mÃ¡s daÃ±o
 @export var attack_range: float = 2.5  # Mayor rango de ataque
 @export var score_value: int = 15  # +50% mÃ¡s puntos
+@export var attack_cooldown: float = 0.8  # Cooldown entre ataques
 
 # IA mejorada
 @export_category("AI Behavior")
@@ -14,7 +15,7 @@ extends CharacterBody3D
 @export var strafe_enabled: bool = true  # Movimiento lateral inteligente
 @export var flank_chance: float = 0.3  # 30% probabilidad de flanquear
 @export var retreat_health_pct: float = 0.2  # Retirarse al 20% de vida
-@export var max_distance_from_player: float = 25.0  # Distancia mÃ¡xima del jugador
+@export var max_distance_from_player: float = 60.0  # Aumentado para soportar rangos triples
 
 var current_health: int
 var target: Node3D = null
@@ -67,9 +68,9 @@ const MECHA_MODELS: Array[String] = [
 	"res://assets/models/characters/Enemies_mecha/ReconBot.obj"
 ]
 
-const DISTANCE_CULLING_THRESHOLD: float = 50.0  # No AI updates beyond this
+const DISTANCE_CULLING_THRESHOLD: float = 100.0  # Aumentado para permitir combate a larga distancia
 const ANIMATION_UPDATE_INTERVAL: float = 0.2    # Update animation every 0.2s
-const SHADOW_CULLING_DISTANCE: float = 40.0   # Disable shadows beyond this
+const SHADOW_CULLING_DISTANCE: float = 80.0   # Aumentado para mechas grandes
 var _ai_update_timer: float = 0.0
 var _is_ai_frozen: bool = false
 var _player_ref: Node3D = null
@@ -303,12 +304,26 @@ func _physics_process(delta: float) -> void:
 	if is_authority:
 		if not is_on_floor(): velocity += get_gravity() * delta
 		
+		# Actualizar cooldown de ataque cada frame (independiente de la cadencia de IA)
+		if _attack_cooldown > 0:
+			_attack_cooldown -= delta
+			
+		# ATAQUE FRAME-PERFECT: Disparar inmediatamente cuando el cooldown llegue a 0 si está en estado ATTACK
+		if current_state == State.ATTACK and _attack_cooldown <= 0:
+			if target and is_instance_valid(target):
+				# Mirar al target antes de atacar (para que los proyectiles salgan rectos)
+				var look_dir = (target.global_position - global_position).normalized()
+				rotation.y = atan2(look_dir.x, look_dir.z)
+				velocity = Vector3.ZERO
+				_perform_attack()
+				_attack_cooldown = attack_cooldown
+			
 		# Batch AI updates: only update every few frames for far enemies
 		_ai_update_timer += delta
 		var update_interval = 0.1 if distance_to_player < 15.0 else 0.3
 		if _ai_update_timer >= update_interval:
+			_handle_state_machine(_ai_update_timer)
 			_ai_update_timer = 0.0
-			_handle_state_machine(delta)
 		
 		move_and_slide()
 	
@@ -318,9 +333,10 @@ func _physics_process(delta: float) -> void:
 		_animate_visuals(delta)
 		_anim_time = 0.0
 	
-	# Mantener escala del modelo visual
+	# Mantener escala y posición del modelo visual (evitar drift por animaciones ocultas)
 	if _visual_model and _scale_initialized:
 		_visual_model.scale = _base_scale
+		_visual_model.position = Vector3.ZERO
 
 func _handle_state_machine(delta: float) -> void:
 	# VerificaciÃ³n de seguridad: si ya estÃ¡ muerto, no procesar
@@ -333,9 +349,7 @@ func _handle_state_machine(delta: float) -> void:
 	if target == null:
 		_find_nearest_target()
 	
-	# Actualizar cooldown de ataque
-	if _attack_cooldown > 0:
-		_attack_cooldown -= delta
+	# Actualizar cooldown de ataque (ahora se hace en _physics_process)
 	
 	# IA mejorada: evaluar estado cada reaction_time
 	_reaction_timer += delta
@@ -433,13 +447,8 @@ func _handle_state_machine(delta: float) -> void:
 			if dist > attack_range + 0.5:
 				current_state = State.CHASE
 			else:
-				# Mirar al target mientras ataca
-				var look_dir = (target.global_position - global_position).normalized()
-				rotation.y = atan2(look_dir.x, look_dir.z)
+				# El ataque ahora se gestiona en _physics_process para precisión frame-perfect
 				velocity = Vector3.ZERO
-				if _attack_cooldown <= 0:
-					_perform_attack()
-					_attack_cooldown = 0.8  # Cooldown entre ataques
 
 func _evaluate_state() -> void:
 	# Evaluar si cambiar de estado basado en situaciÃ³n
@@ -706,9 +715,11 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 		old_mecha.queue_free()
 		visual.remove_child(old_mecha)
 	
-	# 2. Ocultar todos los mesh de los esqueletos originales (Skeleton_Rogue, etc.)
+	# 2. Ocultar meshes y DETENER animaciones de los esqueletos originales para evitar que muevan el pivot
 	for child in visual.find_children("*", "MeshInstance3D", true, false):
 		child.hide()
+	for child in visual.find_children("*", "AnimationPlayer", true, false):
+		child.stop()
 	
 	var res = _mecha_model_assets[index]
 	var mecha_node: Node3D = null
@@ -743,17 +754,48 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 					# para evitar que el renderer se queje de materiales nulos en superficies inexistentes
 					pass
 				
-		# 4. Ajustar escala y posición
+		# 4. Ajustar escala, rotación y CENTRADO CRÍTICO
 		mecha_node.scale = Vector3(1.0, 1.0, 1.0)
-		mecha_node.position = Vector3(0, 0, 0)
-		# Rotar si está de espaldas (Godot mira hacia Z-)
 		mecha_node.rotation_degrees = Vector3(0, 180, 0)
+		_center_mecha_model(mecha_node)
 		
 		# Fix: Asegurar que la barra de vida se vea por encima del modelo mecha
 		_fix_health_bar_for_mecha()
 
-func _animate_visuals(delta: float) -> void:
+func _animate_visuals(_delta: float) -> void:
 	# Escala fija - no permitir cambios dinÃ¡micos de tamaÃ±o
 	if _visual_model and _scale_initialized:
 		# Mantener siempre la escala base sin animaciones
 		_visual_model.scale = _base_scale
+		_visual_model.position = Vector3.ZERO
+
+func _center_mecha_model(model: Node3D) -> void:
+	# Centrado geométrico para evitar "orbiting"
+	var meshes: Array[MeshInstance3D] = []
+	if model is MeshInstance3D:
+		meshes.append(model)
+	for child in model.find_children("*", "MeshInstance3D", true, false):
+		meshes.append(child)
+	
+	if meshes.is_empty():
+		model.position = Vector3.ZERO
+		return
+	
+	var aabb := AABB()
+	var first := true
+	for mesh in meshes:
+		if mesh.mesh:
+			var local_aabb := mesh.mesh.get_aabb()
+			var mesh_transform := mesh.transform
+			var transformed_aabb := mesh_transform * local_aabb
+			if first:
+				aabb = transformed_aabb
+				first = false
+			else:
+				aabb = aabb.merge(transformed_aabb)
+	
+	# Aplicar offset negativo del centro para que coincida con el origen (0,0,0)
+	var center := aabb.get_center()
+	model.position = -(model.quaternion * (model.scale * center))
+	# Asegurar que toque el suelo (Y=0)
+	model.position.y = 0

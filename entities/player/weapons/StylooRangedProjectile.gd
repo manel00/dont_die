@@ -97,7 +97,7 @@ func _create_visual_mesh() -> void:
 		
 		# Escala: Multiplicada por 3 a petición del usuario (aprox 21x del base 0.008)
 		var is_small := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet"
-		var scale_val := 28.0 if is_small else 12.0 # Aumentado ligeramente para mejor visibilidad
+		var scale_val := 18.0 if is_small else 12.0 
 		loaded_model.scale = Vector3(scale_val, scale_val, scale_val)
 		
 		# Orientación base FBX -> Dirección proyectil (-Z)

@@ -1,4 +1,4 @@
-﻿extends EnemyBase
+extends EnemyBase
 
 ## Rogue â€” usa Skeleton_Rogue.glb (KayKit Skeletons)
 ## Enemigo rÃ¡pido de cuerpo a cuerpo con dagas
@@ -11,7 +11,7 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 3.0  # Mayor rango
-	move_speed = 5.6  # 80% mÃ¡s lento
+	move_speed = 6.72  # +20% (5.6 * 1.2)
 	attack_damage = 25  # +67% mÃ¡s daÃ±o
 	max_health = 180  # +50% mÃ¡s vida
 	current_health = 180

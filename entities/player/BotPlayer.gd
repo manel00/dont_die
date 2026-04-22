@@ -114,9 +114,11 @@ func _apply_companion_bot_texture() -> void:
 		var visual := get_node_or_null("VisualModel")
 		if not visual: return
 		
-		# Ocultar todos los mesh de los esqueletos originales
+		# 2. Ocultar meshes y DETENER animaciones de los esqueletos originales
 		for child in visual.find_children("*", "MeshInstance3D", true, false):
 			child.hide()
+		for child in visual.find_children("*", "AnimationPlayer", true, false):
+			child.stop()
 			
 		var mecha_node: Node3D = null
 		if obj_mesh is PackedScene:
@@ -134,8 +136,25 @@ func _apply_companion_bot_texture() -> void:
 					mi.set_surface_override_material(0, mat)
 			
 			mecha_node.scale = Vector3(1.0, 1.0, 1.0)
-			mecha_node.position = Vector3(0, 0, 0)
 			mecha_node.rotation_degrees = Vector3(0, 180, 0)
+			_center_mecha_model(mecha_node)
+
+func _center_mecha_model(model: Node3D) -> void:
+	var meshes: Array[MeshInstance3D] = []
+	if model is MeshInstance3D: meshes.append(model)
+	for child in model.find_children("*", "MeshInstance3D", true, false):
+		meshes.append(child)
+	if meshes.is_empty(): return
+	var aabb := AABB()
+	var first := true
+	for mesh in meshes:
+		if mesh.mesh:
+			var transformed_aabb := mesh.transform * mesh.mesh.get_aabb()
+			if first: aabb = transformed_aabb; first = false
+			else: aabb = aabb.merge(transformed_aabb)
+	var center := aabb.get_center()
+	model.position = -(model.quaternion * (model.scale * center))
+	model.position.y = 0
 func _physics_process(delta: float) -> void:
 	if not multiplayer.is_server():
 		return
@@ -435,6 +454,7 @@ func _move(delta: float) -> void:
 		if visual_model and dir.length() > 0.1:
 			var rot := atan2(dir.x, dir.z)
 			visual_model.rotation.y = lerp_angle(visual_model.rotation.y, rot, 15.0 * delta)
+			visual_model.position = Vector3.ZERO
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, actual_speed * delta * 5.0)
 		velocity.z = move_toward(velocity.z, 0.0, actual_speed * delta * 5.0)

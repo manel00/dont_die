@@ -3,8 +3,7 @@ extends EnemyBase
 ## Mage â€” usa Skeleton_Mage.glb (KayKit Skeletons)
 ## MINIBOSS: Ataque a distancia con proyectiles elementales (hielo, fuego, electric)
 
-var attack_cooldown: float = 2.0
-var _attack_timer: float = 0.0
+# El attack_cooldown ahora se hereda de EnemyBase
 var projectile_scene := preload("res://entities/player/weapons/Projectile.tscn")
 
 # Elemental projectile types
@@ -17,13 +16,13 @@ const ANIM_ATTACK := "Attack"
 
 func _ready() -> void:
 	super._ready()
-	attack_range = 15.0  # Mayor rango para miniboss
+	attack_range = 45.0  # Triple de rango (15.0 * 3)
 	move_speed = 1.6  # 80% mÃ¡s lento
 	max_health = 350  # +75% mÃ¡s vida
 	current_health = max_health
 	attack_damage = 50  # +43% mÃ¡s daÃ±o
 	score_value = 75  # +50% mÃ¡s puntos por ser miniboss
-	attack_cooldown = 1.5  # Ataques mÃ¡s frecuentes
+	attack_cooldown = 1.0  # Disparar cada segundo sin parar (petición usuario)
 	_find_anim_player()
 	_setup_staff_visual()
 	_setup_glow()
@@ -72,10 +71,6 @@ func _load_animations(_anim_path := "") -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
-	
-	if current_state == State.ATTACK:
-		_attack_timer -= delta
-	
 	_update_animation()
 
 func _update_animation() -> void:
@@ -101,11 +96,8 @@ func _perform_attack() -> void:
 	var move_dir := Vector3(dir.x, 0, dir.z).normalized()
 	rotation.y = atan2(move_dir.x, move_dir.z)
 	
-	if _attack_timer <= 0.0:
-		_attack_timer = attack_cooldown
-		
-		# MINIBOSS: Lanzar 3 proyectiles elementales en abanico
-		for i in range(3):
+	# MINIBOSS: Lanzar 3 proyectiles elementales en abanico
+	for i in range(3):
 			var element := (ElementalType.ICE + i) % 3 as ElementalType
 			_shoot_elemental_projectile(move_dir, element, i - 1)
 

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i 's/var _katana_timer: float = 0\\\\.0//' entities/player/PlayerController.gd)",
+      "Bash(sed -i 's/var _fireball_timer: float = 0\\\\.0//' entities/player/PlayerController.gd)",
+      "Bash(sed -i 's/var _explosion_timer: float = 0\\\\.0//' entities/player/PlayerController.gd)",
+      "Bash(sed -i 's/var _weapon_timer: float = 0\\\\.0//' entities/player/PlayerController.gd)",
+      "Bash(xxd \"C:\\\\Users\\\\Manel\\\\Documents\\\\Projectos\\\\test_godot\\\\addons\\\\godot_mcp\\\\commands\\\\input_commands.gd\")",
+      "mcp__godot__*",
+      "Bash(dir \"C:\\\\Users\\\\Manel\\\\Documents\\\\Projectos\\\\test_godot\\\\server\\\\\")",
+      "Bash(npm run *)",
+      "Bash(node dist/index.js --help)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(node dist/index.js)",
+      "Bash(dir addons *)",
+      "Read(//c/Users/Manel/.claude/**)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["godot"]
+}
