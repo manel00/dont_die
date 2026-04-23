@@ -3,7 +3,6 @@ extends EnemyBase
 ## ShieldEnemy — ahora es ranged (arquero con escudo)
 
 var projectile_scene := preload("res://entities/player/weapons/Projectile.tscn")
-var attack_cooldown: float = 1.2
 var _attack_timer: float = 0.0
 
 var _anim_player: AnimationPlayer = null

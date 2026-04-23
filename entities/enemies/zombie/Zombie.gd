@@ -2,7 +2,6 @@
 
 ## Zombie â€” usa Skeleton_Minion.glb (KayKit Skeletons)
 
-var attack_cooldown: float = 1.0
 var _attack_timer: float = 0.0
 
 # Animaciones del Skeleton_Minion
