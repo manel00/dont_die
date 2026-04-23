@@ -241,12 +241,16 @@ func _physics_process(delta: float) -> void:
 		if rot_node:
 			rot_node.look_at(global_position + direction, Vector3.UP)
 	
-	# 2. Rotación de voltereta (Somersault) en el contenedor visual
+	# 2. Rotación visual en el contenedor
 	if _spin_speed > 0:
 		var model_container = get_node_or_null("RotationNode/ModelContainer")
 		if model_container:
-			# Rotación sobre el eje lateral (X local) para que gire como una voltereta hacia adelante
-			model_container.rotate_object_local(Vector3.RIGHT, deg_to_rad(_spin_speed * delta))
+			if weapon_type.contains("shuriken"):
+				# Shurikens: Giran como un frisbee (Horizontalmente sobre el eje Y local)
+				model_container.rotate_object_local(Vector3.UP, deg_to_rad(_spin_speed * delta))
+			else:
+				# Otros: Giran como una voltereta (Verticalmente sobre el eje X local)
+				model_container.rotate_object_local(Vector3.RIGHT, deg_to_rad(_spin_speed * delta))
 	
 	# Gravedad desactivada para hachas si se lanzan como shurikens (recto)
 	# if _is_axe:
