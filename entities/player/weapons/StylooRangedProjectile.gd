@@ -41,33 +41,35 @@ func _setup_weapon_behavior() -> void:
 	_is_setup = true
 	
 	# Limpiar visuales previos si existen (caso de cambio en runtime)
-	var prev = get_node_or_null("ModelContainer")
-	if prev: prev.queue_free()
+	var prev = get_node_or_null("RotationNode")
+	if prev: 
+		remove_child(prev)
+		prev.queue_free()
 	
 	match weapon_type:
 		"shuriken1", "shuriken2", "shuriken3", "shuriken4":
-			# Shurikens: RÃ¡pido, rebota, daÃ±o medio
+			# Shurikens: Rápido, rebota, rotación de voltereta
 			speed = 35.0
 			damage = 22
 			life_time = 2.5
-			_max_pierce = 0  # No atraviesa, rebota
-			_spin_speed = 720.0  # RPM de rotaciÃ³n
+			_max_pierce = 0
+			_spin_speed = 1200.0 # Voltereta rápida
 			
 		"kunai", "coolknife", "bayonet":
-			# Cuchillos: Muy rÃ¡pido, atraviesa 3 enemigos, vuela recto
+			# Cuchillos: Ahora también con voltereta dinámica
 			speed = 45.0
 			damage = 28
 			life_time = 2.0
 			_max_pierce = 3
-			_spin_speed = 0  # No rota, vuela recto (apunta con la punta)
+			_spin_speed = 1000.0 # Efecto de voltereta
 			
 		"doubleAxe", "simpleAxe":
-			# Hachas: Ahora se lanzan como shurikens (rápido, recto, giro rápido)
+			# Hachas: Voltereta pesada
 			speed = 35.0
 			damage = 65
 			life_time = 3.5
 			_max_pierce = 0
-			_spin_speed = 800.0  # Giro rápido de hacha
+			_spin_speed = 1100.0
 			_is_axe = true
 	
 	# Crear mesh visual usando el modelo real del arma
@@ -76,10 +78,15 @@ func _setup_weapon_behavior() -> void:
 const WEAPON_PACK_PATH := "res://assets/models/weapons/weaponsassetspackbyStyloo/"
 
 func _create_visual_mesh() -> void:
-	# Contenedor para aplicar rotaciones base sin romper la orientación global
+	# 1. Nodo de rotación de vuelo (Mira hacia la dirección del proyectil)
+	var rot_node = Node3D.new()
+	rot_node.name = "RotationNode"
+	add_child(rot_node)
+	
+	# 2. Contenedor de giro visual (Hace la voltereta)
 	var model_container = Node3D.new()
 	model_container.name = "ModelContainer"
-	add_child(model_container)
+	rot_node.add_child(model_container)
 	
 	# Determinar archivo a cargar
 	var weapon_file := "ASSETS.fbx_" + weapon_type + ".fbx"
@@ -95,34 +102,28 @@ func _create_visual_mesh() -> void:
 		# Centrar y orientar el modelo para proyectiles
 		model_container.add_child(loaded_model)
 		
-		# Escala: Multiplicada por 3 a petición del usuario (aprox 21x del base 0.008)
+		# Escala: 18 para pequeños, 12 para medianos
 		var is_small := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet"
 		var scale_val := 18.0 if is_small else 12.0 
 		loaded_model.scale = Vector3(scale_val, scale_val, scale_val)
 		
 		# Orientación base FBX -> Dirección proyectil (-Z)
-		# Sentido común: Punta hacia adelante (-Z)
-		# Shurikens: Acostados (90 grados en X) para volar como frisbi
 		if weapon_type.contains("shuriken"):
 			loaded_model.rotation_degrees = Vector3(90, 0, 0)
 		else:
-			# Kunais, Cuchillos, Bayonetas: Punta hacia adelante (-Z desde FBX +X)
 			loaded_model.rotation_degrees = Vector3(0, 90, 0)
 			
 		_apply_projectile_texture(loaded_model)
-		
-		# CRITICAL FIX: Centrar el modelo escalado/rotado para que el Area3D esté en el centro real del objeto
-		# IMPORTANTE: Se multiplica por la escala y rotación del propio modelo para el ajuste exacto
 		_center_projectile_model(loaded_model)
 	else:
-		# Fallback mesh si no hay modelo (mejorado)
+		# Fallback mesh
 		var fallback = MeshInstance3D.new()
 		fallback.mesh = BoxMesh.new()
 		fallback.mesh.size = Vector3(0.1, 0.1, 0.6)
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = _get_weapon_color()
 		mat.emission_enabled = true
-		mat.emission = mat.albedo_color * 3.0 # Más brillo para el fallback
+		mat.emission = mat.albedo_color * 3.0
 		fallback.material_override = mat
 		model_container.add_child(fallback)
 
@@ -234,19 +235,18 @@ func _physics_process(delta: float) -> void:
 	# Mover proyectil
 	global_position += direction * speed * delta
 	
-	# Orientar el proyectil hacia donde vuela (PUNTA HACIA ADELANTE)
+	# 1. Orientar el nodo de rotación hacia donde vuela
 	if direction.length() > 0.001:
-		look_at(global_position + direction, Vector3.UP)
+		var rot_node = get_node_or_null("RotationNode")
+		if rot_node:
+			rot_node.look_at(global_position + direction, Vector3.UP)
 	
-	# Rotar según tipo (shurikens giran sobre su eje mientras vuelan)
+	# 2. Rotación de voltereta (Somersault) en el contenedor visual
 	if _spin_speed > 0:
-		if weapon_type.contains("shuriken"):
-			# Rotación sobre el eje Y (eje vertical del shuriken acostado)
-			rotate_object_local(Vector3.UP, deg_to_rad(_spin_speed * delta))
-		else:
-			# Otros (hachas): Rotación somersault sobre el eje lateral (X local)
-			# IMPORTANTE: Usar Vector3.RIGHT para que gire como hacha lanzada
-			rotate_object_local(Vector3.RIGHT, deg_to_rad(_spin_speed * delta))
+		var model_container = get_node_or_null("RotationNode/ModelContainer")
+		if model_container:
+			# Rotación sobre el eje lateral (X local) para que gire como una voltereta hacia adelante
+			model_container.rotate_object_local(Vector3.RIGHT, deg_to_rad(_spin_speed * delta))
 	
 	# Gravedad desactivada para hachas si se lanzan como shurikens (recto)
 	# if _is_axe:

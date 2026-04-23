@@ -104,6 +104,7 @@ func _perform_attack() -> void:
 func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spread_index: int) -> void:
 	"""Dispara un proyectil elemental con color y efecto segÃºn el tipo."""
 	var proj := projectile_scene.instantiate()
+	proj.scale = Vector3(2.0, 2.0, 2.0) # Doble de grande a petición del usuario
 	proj.hit_group = "player"
 	proj.damage = attack_damage
 	

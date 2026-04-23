@@ -961,19 +961,20 @@ func _setup_styloo_weapon_visual() -> void:
 		var is_sword_katana: bool = weapon_key.contains("sword") or weapon_key.contains("katana")
 		
 		if is_very_small:
-			# Objetos minúsculos (shurikens, cuchillos): reducido 50% (1350x)
-			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 1350.0
+			# Otros objetos minúsculos: reducido 50% (1350x)
+			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 675.0
 			_weapon_visual.position = Vector3(0.15, 0.55, 0.25)
+			_weapon_visual.rotation_degrees = Vector3(0, 90, 90)
 		elif is_sword_katana:
 			# Espadas y katanas: Reducidas un 50% según el usuario (450x del base 0.008)
 			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 450.0
 			_weapon_visual.position = Vector3(0.25, 0.6, 0.35)
+			_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
 		else:
 			# Otros (hachas, picos): Reducido 50% (450x)
 			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 450.0
 			_weapon_visual.position = Vector3(0.25, 0.6, 0.35)
-			
-		_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
+			_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
 		# Aplicar la textura correcta
 		_apply_weapon_materials_to_node(_weapon_visual)
 		
