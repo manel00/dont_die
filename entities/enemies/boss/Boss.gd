@@ -1,4 +1,4 @@
-﻿extends EnemyBase
+extends EnemyBase
 
 ## Boss â€” usa Skeleton_Rogue.glb (KayKit Skeletons)
 ## BOSS FINAL: Usa textura MechaGolem para diferenciarse
