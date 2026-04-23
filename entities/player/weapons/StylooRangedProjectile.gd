@@ -102,9 +102,9 @@ func _create_visual_mesh() -> void:
 		# Centrar y orientar el modelo para proyectiles
 		model_container.add_child(loaded_model)
 		
-		# Escala: 18 para pequeños, 12 para medianos
+		# Escala: Reducida un 50% a petición del usuario
 		var is_small := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet"
-		var scale_val := 18.0 if is_small else 12.0 
+		var scale_val := 9.0 if is_small else 6.0 
 		loaded_model.scale = Vector3(scale_val, scale_val, scale_val)
 		
 		# Orientación base FBX -> Dirección proyectil (-Z)
