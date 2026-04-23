@@ -181,7 +181,7 @@ func _build_visual() -> void:
 		var is_small_weapon := weapon_type.contains("shuriken") or weapon_type == "kunai" or weapon_type.contains("knife") or weapon_type == "bayonet" or weapon_type.contains("Axe") or weapon_type == "pickaxe"
 		var scale_multiplier := 450.0 if is_small_weapon else 300.0
 		
-		loaded_model.scale = _weapon_data.scale * scale_multiplier
+		loaded_model.scale = _weapon_data.scale * scale_multiplier * 0.5
 		loaded_model.rotation_degrees = _weapon_data.rotation
 		_apply_texture(loaded_model)
 		_center_model(loaded_model)

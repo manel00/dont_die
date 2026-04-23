@@ -12,7 +12,7 @@ const server = new Server({
         tools: {}
     }
 });
-const godotPort = parseInt(process.env.GODOT_WS_PORT ?? "6505", 10);
+const godotPort = parseInt(process.env.GODOT_WS_PORT ?? process.env.GODOT_PORT ?? "6505", 10);
 const godot = new GodotWsServer(godotPort);
 godot.start();
 const CORE_TOOLS = [

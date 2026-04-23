@@ -31,7 +31,12 @@ export class GodotWsServer {
   }
 
   start(): void {
-    this.wss = new WebSocketServer({ port: this.port });
+    try {
+      this.wss = new WebSocketServer({ port: this.port });
+    } catch (err) {
+      console.error(`[GodotWsServer] Port ${this.port} already in use, server may already be running`);
+      return;
+    }
     
     this.wss.on("connection", (ws: WebSocket) => {
       console.error(`[GodotWsServer] Client connected on port ${this.port}`);

@@ -7,7 +7,7 @@
 ## Reglas Generales
 
 - Todos los enemigos heredan de `EnemyBase` (`entities/enemies/base/EnemyBase.gd`)
-- La IA usa una máquina de estados: `IDLE → CHASE → ATTACK → STRAFE / RETREAT → DEAD`
+- La IA usa una máquina de estados: `IDLE → CHASE → ATTACK → DEAD`
 - El daño lo gestiona el servidor; los clientes solo reciben sincronización visual
 - Los enemigos tienen culling de distancia: se congelan a más de 50 unidades del jugador
 
