@@ -80,7 +80,7 @@ func _perform_attack() -> void:
 				continue
 			if is_instance_valid(p) and p.global_position.distance_to(global_position) < attack_range:
 				if p.has_method("take_damage"): 
-					p.take_damage(attack_damage)
+					p.take_damage(int(attack_damage * damage_multiplier))
 
 func die() -> void:
 	# Override para aÃ±adir efecto de muerte de minion (explosiÃ³n pequeÃ±a)

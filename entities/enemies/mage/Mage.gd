@@ -106,7 +106,7 @@ func _shoot_elemental_projectile(base_dir: Vector3, element: ElementalType, spre
 	var proj := projectile_scene.instantiate()
 	proj.scale = Vector3(2.0, 2.0, 2.0) # Doble de grande a petición del usuario
 	proj.hit_group = "player"
-	proj.damage = attack_damage
+	proj.damage = int(attack_damage * damage_multiplier)
 	
 	# Calcular direcciÃ³n con spread (abanico)
 	var spread_angle: float = deg_to_rad(15.0 * spread_index)  # -15Â°, 0Â°, +15Â°

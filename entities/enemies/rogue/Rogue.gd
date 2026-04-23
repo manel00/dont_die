@@ -103,7 +103,7 @@ func _perform_attack() -> void:
 		for e in enemies:
 			if is_instance_valid(e) and e.global_position.distance_to(global_position) < attack_range:
 				if e.has_method("take_damage"): 
-					e.take_damage(attack_damage)
+					e.take_damage(int(attack_damage * damage_multiplier))
 					# Efecto visual de sangre/daÃ±o
 					_blood_effect(e.global_position)
 

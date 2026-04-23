@@ -14,16 +14,16 @@ extends CharacterBody3D
 @export var reaction_time: float = 0.3  # Tiempo de reacciÃ³n
 @export var strafe_enabled: bool = true  # Movimiento lateral inteligente
 @export var flank_chance: float = 0.3  # 30% probabilidad de flanquear
-@export var retreat_health_pct: float = 0.2  # Retirarse al 20% de vida
 @export var max_distance_from_player: float = 60.0  # Aumentado para soportar rangos triples
 
 var current_health: int
 var target: Node3D = null
 var nav_agent: NavigationAgent3D
+var damage_multiplier: float = 1.0
 var _health_bar_fill: Sprite3D
 var _health_bar_bg: Sprite3D  # Fondo negro para mejor contraste
 
-enum State { IDLE, CHASE, ATTACK, DEAD, STRAFE, RETREAT }
+enum State { IDLE, CHASE, ATTACK, DEAD, STRAFE }
 var current_state: State = State.IDLE
 var _is_mecha_active: bool = false
 
@@ -414,30 +414,10 @@ func _handle_state_machine(delta: float) -> void:
 				var target_rotation = atan2(move_direction.x, move_direction.z)
 				rotation.y = lerp_angle(rotation.y, target_rotation, 12.0 * delta)
 			
-			# Volver a chase despuÃ©s de strafear un poco
+			# Volver a chase despuÃs de strafear un poco
 			if randf() < 0.02:  # 2% chance por frame de salir de strafe
 				current_state = State.CHASE
-			
-		State.RETREAT:
-			if target == null:
-				current_state = State.IDLE
-				return
-			
-			# Huir del jugador cuando estÃ¡ bajo de vida
-			var to_target = target.global_position - global_position
-			var retreat_dir = -Vector3(to_target.x, 0, to_target.z).normalized()
-			
-			velocity.x = retreat_dir.x * move_speed * 0.7
-			velocity.z = retreat_dir.z * move_speed * 0.7
-			
-			if retreat_dir.length() > 0.01:
-				var target_rotation = atan2(retreat_dir.x, retreat_dir.z)
-				rotation.y = lerp_angle(rotation.y, target_rotation, 12.0 * delta)
-			
-			# Buscar ayuda o recuperarse
-			if current_health > max_health * 0.4:
-				current_state = State.CHASE
-			
+
 		State.ATTACK:
 			if target == null or not is_instance_valid(target):
 				current_state = State.IDLE
@@ -451,25 +431,26 @@ func _handle_state_machine(delta: float) -> void:
 				velocity = Vector3.ZERO
 
 func _evaluate_state() -> void:
-	# Evaluar si cambiar de estado basado en situaciÃ³n
+	# Evaluar si cambiar de estado basado en situación
 	if current_state == State.DEAD or target == null:
 		return
 	
 	var health_pct = float(current_health) / max_health
 	var dist = global_position.distance_to(target.global_position)
 	
-	# PRIORIDAD: Si estÃ¡ a mÃ¡s de max_distance, siempre chase aunque estÃ© en otro estado
+	# PRIORIDAD: Si está a más de max_distance, siempre chase aunque esté en otro estado
 	if dist > max_distance_from_player and current_state != State.CHASE and current_state != State.ATTACK:
 		current_state = State.CHASE
 		_is_flanking = false
 		return
 	
-	# Retirarse si vida muy baja (solo si no estÃ¡ muy lejos)
-	if health_pct < retreat_health_pct and current_state != State.RETREAT and dist <= max_distance_from_player:
-		current_state = State.RETREAT
-		return
+	# Daño aumentado al 20% de vida (sin huir)
+	if health_pct < 0.2:
+		damage_multiplier = 1.2
+	else:
+		damage_multiplier = 1.0
 	
-	# Strafe si estÃ¡ muy cerca y no puede atacar (solo si no estÃ¡ muy lejos)
+	# Strafe si está muy cerca y no puede atacar (solo si no está muy lejos)
 	if dist < attack_range * 0.8 and current_state == State.CHASE and strafe_enabled and dist <= max_distance_from_player:
 		_strafe_direction = 1 if randf() > 0.5 else -1
 		current_state = State.STRAFE
@@ -795,7 +776,9 @@ func _center_mecha_model(model: Node3D) -> void:
 				aabb = aabb.merge(transformed_aabb)
 	
 	# Aplicar offset negativo del centro para que coincida con el origen (0,0,0)
+	# IMPORTANTE: No aplicar model.quaternion porque el AABB ya está transformado
+	# por la rotación del modelo. El centro ya está en coordenadas del mundo.
+	# Simplemente negamos el centro directamente.
 	var center := aabb.get_center()
-	model.position = -(model.quaternion * (model.scale * center))
-	# Asegurar que toque el suelo (Y=0)
+	model.position = -center
 	model.position.y = 0

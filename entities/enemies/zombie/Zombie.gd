@@ -69,6 +69,6 @@ func _perform_attack() -> void:
 	
 	if _attack_timer <= 0.0:
 		if target.has_method("take_damage"):
-			target.take_damage(attack_damage)
+			target.take_damage(int(attack_damage * damage_multiplier))
 			# print("Â¡Zombi muerde al jugador por ", attack_damage, "!")
 			_attack_timer = attack_cooldown

@@ -90,7 +90,7 @@ func _shoot_electric_bolt(move_dir: Vector3) -> void:
 	var proj := projectile_scene.instantiate()
 	proj.scale = Vector3(2.0, 2.0, 2.0) # Doble de grande a petición del usuario
 	proj.hit_group = "player"
-	proj.damage = attack_damage
+	proj.damage = int(attack_damage * damage_multiplier)
 	proj.speed = 40.0  # Muy rápido — mecha agresivo
 
 	# Color eléctrico amarillo brillante
