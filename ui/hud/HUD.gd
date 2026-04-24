@@ -11,7 +11,7 @@ extends CanvasLayer
 @onready var damage_overlay: ColorRect = $DamageOverlay
 @onready var final_score_label: Label = $GameOverOverlay/CenterContainer/VBoxContainer/FinalScoreLabel
 @onready var radar_container: Control = $RadarContainer
-@onready var radar_circle: ColorRect = $RadarContainer/RadarCircle
+@onready var radar_circle: Panel = $RadarContainer/RadarCircle
 @onready var enemy_markers: Control = $RadarContainer/RadarCircle/EnemyMarkers
 
 # Labels de estado de bots aliados (opcional — se crean dinámicamente si no existen en la escena)
@@ -22,7 +22,7 @@ var _enemy_count_label: Label = null
 const RADAR_RANGE: float = 50.0  # Distance in world units
 const MAX_RADAR_ENEMIES: int = 15  # Limit to prevent lag with 100+ enemies
 const RADAR_UPDATE_INTERVAL: float = 0.1  # Update every 0.1s instead of every frame
-var _radar_dots: Array[ColorRect] = []
+var _radar_dots: Array[Panel] = []
 var _player: Node3D = null
 var _radar_update_timer: float = 0.0
 @warning_ignore("unused_variable")
@@ -279,14 +279,25 @@ func _setup_radar() -> void:
 			_player = p as Node3D
 			break
 	
-	# Create initial pool of radar dots
+	# Create initial pool of radar dots as Panels with rounded style
 	for i in range(20):
-		var dot := ColorRect.new()
-		dot.custom_minimum_size = Vector2(6, 6)
-		dot.color = Color(1, 0, 0, 1)  # Red for enemies
+		var dot := Panel.new()
+		dot.custom_minimum_size = Vector2(8, 8)
 		dot.visible = false
+		dot.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		
+		# Create style for enemy dot - red for visibility on green radar
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(1, 0.15, 0.15, 1)
+		style.corner_radius_top_left = 4
+		style.corner_radius_top_right = 4
+		style.corner_radius_bottom_right = 4
+		style.corner_radius_bottom_left = 4
+		dot.add_theme_stylebox_override("panel", style)
+		
 		enemy_markers.add_child(dot)
 		_radar_dots.append(dot)
+	
 
 func _update_radar(delta: float) -> void:
 	_radar_update_timer += delta
@@ -322,7 +333,7 @@ func _update_radar(delta: float) -> void:
 	
 	# Update dots - hide unused ones first
 	for i in range(_radar_dots.size()):
-		var dot := _radar_dots[i]
+		var dot: Panel = _radar_dots[i]
 		if i < enemies_to_show.size():
 			var enemy_data: Dictionary = enemies_to_show[i]
 			var enemy: Node3D = enemy_data.enemy
@@ -332,18 +343,31 @@ func _update_radar(delta: float) -> void:
 			var angle := atan2(diff.x, diff.z) - _player.rotation.y
 			var normalized_dist := distance / RADAR_RANGE
 			
-			var radar_x := radar_radius + sin(angle) * normalized_dist * radar_radius - 3
-			var radar_y := radar_radius - cos(angle) * normalized_dist * radar_radius - 3
+			var radar_x := radar_radius + sin(angle) * normalized_dist * radar_radius - 4
+			var radar_y := radar_radius + cos(angle) * normalized_dist * radar_radius - 4
 			
 			dot.position = Vector2(radar_x, radar_y)
 			dot.visible = true
 			
-			# Simplified color check - check name only once
+			# Update style based on enemy type
 			var enemy_name = enemy.name
+			var style: StyleBoxFlat = dot.get_theme_stylebox("panel")
+			if not style:
+				style = StyleBoxFlat.new()
+				dot.add_theme_stylebox_override("panel", style)
+			
 			if enemy_name.contains("Mage") or enemy_name.contains("Rogue"):
-				dot.color = Color(1, 0.5, 0, 1)  # Orange for mini-bosses
+				style.bg_color = Color(1, 0.5, 0, 1)  # Orange for mini-bosses
+				style.corner_radius_top_left = 4
+				style.corner_radius_top_right = 4
+				style.corner_radius_bottom_right = 4
+				style.corner_radius_bottom_left = 4
 			else:
-				dot.color = Color(1, 0, 0, 1)  # Red for normal
+				style.bg_color = Color(1, 0.15, 0.15, 1)  # Red for normal
+				style.corner_radius_top_left = 3
+				style.corner_radius_top_right = 3
+				style.corner_radius_bottom_right = 3
+				style.corner_radius_bottom_left = 3
 		else:
 			dot.visible = false
 

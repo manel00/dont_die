@@ -20,7 +20,7 @@ func _ready() -> void:
 	move_speed = 1.6  # 80% más lento
 	max_health = 350  # +75% más vida
 	current_health = max_health
-	attack_damage = 50  # +43% más daño
+	attack_damage = 25  # Daño base para hacer 30 con multiplicador
 	score_value = 75  # +50% más puntos por ser miniboss
 	attack_cooldown = 1.0  # Disparar cada segundo sin parar (petición usuario)
 	# FIX: Actualizar nav_agent con el nuevo attack_range para que la navegación funcione

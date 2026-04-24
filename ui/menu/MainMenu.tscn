@@ -2,6 +2,24 @@
 
 [ext_resource type="Script" uid="uid://bxbp3md7uhovm" path="res://ui/menu/MainMenu.gd" id="1_menu"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0.078, 0.0, 0.122, 0.92)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.749, 0.0, 1.0, 1)
+corner_radius_top_left = 0
+corner_radius_top_right = 0
+corner_radius_bottom_right = 0
+corner_radius_bottom_left = 0
+shadow_color = Color(0.749, 0.0, 1.0, 0.3)
+shadow_size = 4
+content_margin_left = 24.0
+content_margin_top = 20.0
+content_margin_right = 24.0
+content_margin_bottom = 20.0
+
 [node name="MainMenu" type="Control" unique_id=753459109]
 layout_mode = 3
 anchors_preset = 15
@@ -18,7 +36,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.047, 0.063, 0.11, 1)
+color = Color(0.051, 0.0, 0.078, 1)
 
 [node name="BgGrad" type="ColorRect" parent="." unique_id=941509740]
 layout_mode = 1
@@ -27,7 +45,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.06, 0.025, 0.12, 0.5)
+color = Color(0.0, 0.102, 0.055, 0.4)
 
 [node name="MenuContainer" type="CenterContainer" parent="." unique_id=267092349]
 layout_mode = 1
@@ -40,6 +58,16 @@ grow_vertical = 2
 [node name="Card" type="PanelContainer" parent="MenuContainer" unique_id=723637436]
 custom_minimum_size = Vector2(500, 560)
 layout_mode = 2
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.749, 0.0, 1.0, 1)
+corner_radius_top_left = 0
+corner_radius_top_right = 0
+corner_radius_bottom_right = 0
+corner_radius_bottom_left = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MenuContainer/Card" unique_id=1501546898]
 layout_mode = 2
@@ -51,14 +79,20 @@ theme_override_constants/separation = 6
 
 [node name="PreTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection" unique_id=1996080891]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.75, 1, 0.8)
+theme_override_colors/font_color = Color(0.835, 0.502, 1.0, 0.9)
+theme_override_colors/font_shadow_color = Color(0.749, 0.0, 1.0, 0.6)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
-text = "█ BIOHAZARD NETWORK PROTOCOL v2.1"
+text = "█ NERV TERMINAL v2.1"
 horizontal_alignment = 1
 
 [node name="Title" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection" unique_id=2046003727]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.95, 1, 1)
+theme_override_colors/font_color = Color(0.224, 1.0, 0.078, 1)
+theme_override_colors/font_shadow_color = Color(0.224, 1.0, 0.078, 0.8)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 48
 text = "BIODEATH
 ARENA"
@@ -66,7 +100,7 @@ horizontal_alignment = 1
 
 [node name="SubTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection" unique_id=839506796]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.35, 0.65, 0.95, 0.7)
+theme_override_colors/font_color = Color(0.749, 0.0, 1.0, 0.8)
 theme_override_font_sizes/font_size = 12
 text = "SURVIVAL SHOOTER  |  SOLO + BOTS  |  LAN CO-OP"
 horizontal_alignment = 1
@@ -82,7 +116,7 @@ text = "🎮  SOLO PLAY  (+ 2 AI ALLIES)"
 
 [node name="MapLabel" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=333280495]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+theme_override_colors/font_color = Color(0.224, 1.0, 0.078, 0.7)
 theme_override_font_sizes/font_size = 10
 text = "SELECT DEPLOYMENT ZONE"
 horizontal_alignment = 1
@@ -103,7 +137,7 @@ text = "○ LA SAGRERA"
 
 [node name="EnemyLabel" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=544766485]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+theme_override_colors/font_color = Color(0.224, 1.0, 0.078, 0.7)
 theme_override_font_sizes/font_size = 10
 text = "SELECT INVASION TYPE"
 horizontal_alignment = 1
@@ -132,7 +166,7 @@ theme_override_constants/separation = 8
 
 [node name="IPLabel" type="Label" parent="MenuContainer/Card/VBoxContainer/IPSection" unique_id=412033558]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+theme_override_colors/font_color = Color(0.224, 1.0, 0.078, 0.7)
 theme_override_font_sizes/font_size = 10
 text = "LAN — SERVER IP ADDRESS"
 
@@ -160,21 +194,25 @@ text = "🌐  JOIN LAN"
 
 [node name="StatusLabel" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=1962766600]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_colors/font_color = Color(0.224, 1.0, 0.078, 1)
+theme_override_colors/font_shadow_color = Color(0.224, 1.0, 0.078, 0.5)
+theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
 text = "SELECT GAME MODE"
 horizontal_alignment = 1
 
 [node name="Footer" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=1052589064]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.4, 0.5, 0.5)
+theme_override_colors/font_color = Color(0.42, 0.0, 0.75, 0.5)
 theme_override_font_sizes/font_size = 9
 text = "WASD move  |  Numpad shoot  |  LMB fire  |  1/2/3 weapons  |  SPACE magic  |  R reload"
 horizontal_alignment = 1
 
 [node name="HostIPLabel" type="Label" parent="." unique_id=1220473016]
 layout_mode = 0
-theme_override_colors/font_color = Color(0.3, 1, 0.5, 1)
+theme_override_colors/font_color = Color(0.224, 1.0, 0.078, 1)
+theme_override_colors/font_shadow_color = Color(0.224, 1.0, 0.078, 0.6)
+theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 14
 text = "Your IP: ---.---.---.---"
 horizontal_alignment = 1
@@ -184,3 +222,23 @@ custom_minimum_size = Vector2(0, 40)
 layout_mode = 0
 size_flags_horizontal = 3
 text = "🔍  BUSCAR PARTIDAS"
+
+[node name="Scanlines" type="ColorRect" parent="." unique_id=111111111]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.08)
+
+[node name="GridOverlay" type="ColorRect" parent="." unique_id=222222222]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.224, 1.0, 0.078, 0.02)

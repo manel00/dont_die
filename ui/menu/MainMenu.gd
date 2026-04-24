@@ -11,6 +11,14 @@ extends Control
 @onready var status_label: Label = $MenuContainer/Card/VBoxContainer/StatusLabel
 @onready var host_ip_label: Label = $HostIPLabel
 @onready var find_games_button: Button = $FindGamesButton
+@onready var scanlines: ColorRect = $Scanlines
+@onready var grid_overlay: ColorRect = $GridOverlay
+@onready var menu_card: PanelContainer = $MenuContainer/Card
+@onready var title_label: Label = $MenuContainer/Card/VBoxContainer/TitleSection/Title
+
+var scanline_offset: float = 0.0
+var grid_time: float = 0.0
+var title_glow_phase: float = 0.0
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -22,6 +30,15 @@ func _ready() -> void:
 	enemy_skeletons_button.pressed.connect(_on_skeletons_selected)
 	enemy_mechas_button.pressed.connect(_on_mechas_selected)
 	find_games_button.pressed.connect(_on_find_games_pressed)
+	
+	_connect_hover_signals(host_button)
+	_connect_hover_signals(join_button)
+	_connect_hover_signals(solo_button)
+	_connect_hover_signals(map_arena_button)
+	_connect_hover_signals(map_sagrera_button)
+	_connect_hover_signals(enemy_skeletons_button)
+	_connect_hover_signals(enemy_mechas_button)
+	_connect_hover_signals(find_games_button)
 	
 	# Show local IP for reference
 	_update_local_ip_display()
@@ -35,10 +52,14 @@ func _ready() -> void:
 		NetworkManager.server_disconnected.connect(_on_server_disconnected)
 	
 	GameManager.solo_mode = false
-	_set_status("SELECT GAME MODE", Color(0.5, 0.8, 1.0))
+	_set_status("SELECT GAME MODE", Color(0.224, 1.0, 0.078))
+
+func _connect_hover_signals(button: Button) -> void:
+	button.mouse_entered.connect(_on_button_mouse_entered.bind(button))
+	button.mouse_exited.connect(_on_button_mouse_exited.bind(button))
 
 func _on_solo_pressed() -> void:
-	_set_status("LOADING ARENA — SOLO MODE...", Color(0.6, 1.0, 0.6))
+	_set_status("LOADING ARENA — SOLO MODE...", Color(0.224, 1.0, 0.078))
 	_set_all_buttons_disabled(true)
 	
 	# Use OfflineMultiplayerPeer so multiplayer.is_server() returns true
@@ -51,12 +72,12 @@ func _on_solo_pressed() -> void:
 	_start_game()
 
 func _on_host_pressed() -> void:
-	_set_status("STARTING SERVER...", Color(0.4, 1.0, 0.7))
+	_set_status("STARTING SERVER...", Color(0.835, 0.502, 1.0))
 	_set_all_buttons_disabled(true)
 	GameManager.solo_mode = false
 	
 	if NetworkManager.create_server() == OK:
-		_set_status("SERVER ONLINE — LOADING ARENA...", Color(0.3, 1.0, 0.5))
+		_set_status("SERVER ONLINE — LOADING ARENA...", Color(0.224, 1.0, 0.078))
 		await get_tree().create_timer(0.4).timeout
 		_start_game()
 	else:
@@ -67,22 +88,22 @@ func _on_join_pressed() -> void:
 	var ip: String = ip_line_edit.text.strip_edges()
 	if ip.is_empty():
 		ip = "127.0.0.1"
-	_set_status("CONNECTING TO " + ip + "...", Color(0.9, 0.8, 0.3))
+	_set_status("CONNECTING TO " + ip + "...", Color(0.835, 0.502, 1.0))
 	_set_all_buttons_disabled(true)
 	GameManager.solo_mode = false
 	NetworkManager.join_game(ip)
 
 func _on_connected_ok() -> void:
-	_set_status("CONNECTED — ENTERING ARENA...", Color(0.3, 1.0, 0.5))
+	_set_status("CONNECTED — ENTERING ARENA...", Color(0.224, 1.0, 0.078))
 	await get_tree().create_timer(0.4).timeout
 	_start_game()
 
 func _on_connected_fail() -> void:
-	_set_status("CONNECTION FAILED — CHECK IP", Color(1.0, 0.3, 0.3))
+	_set_status("CONNECTION FAILED — CHECK IP", Color(1.0, 0.2, 0.2))
 	_set_all_buttons_disabled(false)
 
 func _on_server_disconnected() -> void:
-	_set_status("SERVER DISCONNECTED", Color(1.0, 0.3, 0.3))
+	_set_status("SERVER DISCONNECTED", Color(1.0, 0.2, 0.2))
 	_set_all_buttons_disabled(false)
 
 func _set_status(msg: String, color: Color) -> void:
@@ -115,7 +136,7 @@ func _on_mechas_selected() -> void:
 	_update_enemy_selection_visual()
 
 func _on_find_games_pressed() -> void:
-	_set_status("SEARCHING FOR GAMES...", Color(0.9, 0.8, 0.3))
+	_set_status("SEARCHING FOR GAMES...", Color(0.835, 0.502, 1.0))
 	_set_all_buttons_disabled(true)
 	NetworkManager.discover_servers()
 	await get_tree().create_timer(3.0).timeout
@@ -123,9 +144,9 @@ func _on_find_games_pressed() -> void:
 	if servers.size() > 0:
 		var first_ip: String = servers.keys()[0]
 		ip_line_edit.text = first_ip
-		_set_status("FOUND: " + first_ip, Color(0.3, 1.0, 0.5))
+		_set_status("FOUND: " + first_ip, Color(0.224, 1.0, 0.078))
 	else:
-		_set_status("NO GAMES FOUND", Color(1.0, 0.5, 0.3))
+		_set_status("NO GAMES FOUND", Color(1.0, 0.2, 0.2))
 	_set_all_buttons_disabled(false)
 
 func _update_local_ip_display() -> void:
@@ -144,19 +165,56 @@ func _update_local_ip_display() -> void:
 
 func _update_map_selection_visual() -> void:
 	var is_arena = GameManager.selected_map_path == GameManager.MAP_ARENA
-	map_arena_button.modulate = Color(1, 1, 1, 1) if is_arena else Color(0.5, 0.5, 0.5, 1)
-	map_sagrera_button.modulate = Color(1, 1, 1, 1) if !is_arena else Color(0.5, 0.5, 0.5, 1)
+	map_arena_button.modulate = Color(0.224, 1.0, 0.078, 1) if is_arena else Color(0.42, 0.0, 0.75, 0.6)
+	map_sagrera_button.modulate = Color(0.224, 1.0, 0.078, 1) if !is_arena else Color(0.42, 0.0, 0.75, 0.6)
 	
 	map_arena_button.text = "● ARENA CLÁSICA" if is_arena else "○ ARENA CLÁSICA"
 	map_sagrera_button.text = "● LA SAGRERA" if !is_arena else "○ LA SAGRERA"
 
 func _update_enemy_selection_visual() -> void:
 	var is_skeletons = GameManager.enemy_mode == "skeletons"
-	enemy_skeletons_button.modulate = Color(1, 1, 1, 1) if is_skeletons else Color(0.5, 0.5, 0.5, 1)
-	enemy_mechas_button.modulate = Color(1, 1, 1, 1) if !is_skeletons else Color(0.5, 0.5, 0.5, 1)
+	enemy_skeletons_button.modulate = Color(0.224, 1.0, 0.078, 1) if is_skeletons else Color(0.42, 0.0, 0.75, 0.6)
+	enemy_mechas_button.modulate = Color(0.224, 1.0, 0.078, 1) if !is_skeletons else Color(0.42, 0.0, 0.75, 0.6)
 	
 	enemy_skeletons_button.text = "● MODO ESQUELETOS" if is_skeletons else "○ MODO ESQUELETOS"
 	enemy_mechas_button.text = "● MODO MECHAS" if !is_skeletons else "○ MODO MECHAS"
 
 func _start_game() -> void:
 	get_tree().change_scene_to_file(GameManager.selected_map_path)
+
+func _process(delta: float) -> void:
+	scanline_offset += delta * 30.0
+	if scanline_offset > 4.0:
+		scanline_offset = 0.0
+	scanlines.position.y = fmod(scanline_offset, 4.0) - 4.0
+	
+	grid_time += delta
+	var grid_alpha = 0.015 + sin(grid_time * 0.5) * 0.01
+	grid_overlay.color = Color(0.224, 1.0, 0.078, grid_alpha)
+	
+	title_glow_phase += delta * 2.0
+	var glow_intensity = 0.7 + sin(title_glow_phase) * 0.3
+	if title_label:
+		title_label.modulate = Color(1.0, 1.0, 1.0, glow_intensity)
+
+func _on_button_mouse_entered(button: Button) -> void:
+	var tween := create_tween()
+	tween.tween_property(button, "scale", Vector2(1.02, 1.02), 0.1)
+	button.modulate = Color(0.224, 1.0, 0.078, 1.0)
+
+func _on_button_mouse_exited(button: Button) -> void:
+	var tween := create_tween()
+	tween.tween_property(button, "scale", Vector2(1.0, 1.0), 0.1)
+	var is_selected = _is_button_selected(button)
+	button.modulate = Color(0.224, 1.0, 0.078, 1) if is_selected else Color(0.42, 0.0, 0.75, 0.6)
+
+func _is_button_selected(button: Button) -> bool:
+	if button == map_arena_button:
+		return GameManager.selected_map_path == GameManager.MAP_ARENA
+	if button == map_sagrera_button:
+		return GameManager.selected_map_path == GameManager.MAP_SAGRERA
+	if button == enemy_skeletons_button:
+		return GameManager.enemy_mode == "skeletons"
+	if button == enemy_mechas_button:
+		return GameManager.enemy_mode == "mechas"
+	return true
