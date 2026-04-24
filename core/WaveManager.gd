@@ -10,6 +10,10 @@ signal wave_enemy_spawned(wave_number: int, current_count: int, total_count: int
 var minion_scene: PackedScene = preload("res://entities/enemies/minion/Minion.tscn")
 var mage_scene: PackedScene = preload("res://entities/enemies/mage/Mage.tscn")
 var rogue_scene: PackedScene = preload("res://entities/enemies/rogue/Rogue.tscn")
+var boss_scene: PackedScene = preload("res://entities/enemies/boss/Boss.tscn")
+
+# Track boss spawn
+var _boss_spawned: bool = false
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #  WAVE CONFIGURATION - 6 WAVES (triplicadas)
@@ -80,6 +84,7 @@ func _start_wave(wave_number: int) -> void:
 	current_wave = wave_number
 	_wave_in_progress = true
 	_enemies_spawned_this_wave = 0
+	_boss_spawned = false  # Resetear flag del boss
 	
 	var config = WAVE_CONFIG[wave_number]
 	_minions_to_spawn = config["minions"]
@@ -170,6 +175,14 @@ func _spawn_single_enemy() -> void:
 	var scene_to_spawn: PackedScene = null
 	var is_miniboss = false
 	
+	# BOSS SPAWN: En wave 6, spawnear boss cuando queden ~25%
+	if current_wave == 6 and not _boss_spawned:
+		var remaining = _minions_to_spawn + _minibosses_to_spawn
+		if remaining <= int(_total_wave_enemies * 0.25):
+			_spawn_boss()
+			_boss_spawned = true
+			return
+	
 	# Ratio-based spawning: for every 5 minions, spawn 1 miniboss
 	var total_remaining = _minions_to_spawn + _minibosses_to_spawn
 	if total_remaining <= 0:
@@ -181,7 +194,10 @@ func _spawn_single_enemy() -> void:
 	var total_spawned = spawned_minions + spawned_minibosses
 	
 	var target_miniboss_ratio = float(WAVE_CONFIG[current_wave]["minibosses"]) / float(WAVE_CONFIG[current_wave]["total"])
-	var current_miniboss_ratio = float(spawned_minibosses) / float(total_spawned + 1) if total_spawned > 0 else 0.0
+	# FIX: Evitar división por cero y usar safe division
+	var current_miniboss_ratio: float = 0.0
+	if total_spawned > 0:
+		current_miniboss_ratio = float(spawned_minibosses) / float(total_spawned)
 	
 	# Decision: spawn miniboss if we're behind on miniboss ratio
 	if _minibosses_to_spawn > 0 and (current_miniboss_ratio < target_miniboss_ratio or _minions_to_spawn <= 0):
@@ -255,6 +271,26 @@ func _spawn_at_pos(scene: PackedScene, pos: Vector3) -> void:
 		tree.current_scene.add_child(enemies_node)
 		enemies_node.add_child(enemy, true)
 		enemy.global_position = pos + Vector3(0, 1.0, 0)
+
+func _spawn_boss() -> void:
+	# Spawnear el Boss cerca del jugador
+	var players = get_tree().get_nodes_in_group("player")
+	var human_players = []
+	for p in players:
+		if not p.is_in_group("bots"):
+			human_players.append(p)
+	
+	var spawn_pos: Vector3
+	if human_players.size() > 0:
+		var target_player = human_players[randi() % human_players.size()]
+		# Spawnear más lejos para el boss
+		var angle = randf() * TAU
+		var dist = lerp(15.0, 25.0, randf())
+		spawn_pos = target_player.global_position + Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+	else:
+		spawn_pos = Vector3(randf_range(-30, 30), 0, randf_range(-30, 30))
+	
+	_spawn_at_pos(boss_scene, spawn_pos)
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #  WAVE COMPLETION & PROGRESSION

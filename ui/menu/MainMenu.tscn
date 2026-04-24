@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://mainmenu001"]
+[gd_scene format=3 uid="uid://mainmenu001"]
 
-[ext_resource type="Script" path="res://ui/menu/MainMenu.gd" id="1_menu"]
+[ext_resource type="Script" uid="uid://bxbp3md7uhovm" path="res://ui/menu/MainMenu.gd" id="1_menu"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=753459109]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,7 +11,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=166413966]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,7 +20,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.047, 0.063, 0.11, 1)
 
-[node name="BgGrad" type="ColorRect" parent="."]
+[node name="BgGrad" type="ColorRect" parent="." unique_id=941509740]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,7 +29,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.06, 0.025, 0.12, 0.5)
 
-[node name="MenuContainer" type="CenterContainer" parent="."]
+[node name="MenuContainer" type="CenterContainer" parent="." unique_id=267092349]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -37,137 +37,150 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Card" type="PanelContainer" parent="MenuContainer"]
-layout_mode = 2
+[node name="Card" type="PanelContainer" parent="MenuContainer" unique_id=723637436]
 custom_minimum_size = Vector2(500, 560)
+layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MenuContainer/Card"]
+[node name="VBoxContainer" type="VBoxContainer" parent="MenuContainer/Card" unique_id=1501546898]
 layout_mode = 2
 theme_override_constants/separation = 0
 
-[node name="TitleSection" type="VBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+[node name="TitleSection" type="VBoxContainer" parent="MenuContainer/Card/VBoxContainer" unique_id=1298707575]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="PreTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection"]
+[node name="PreTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection" unique_id=1996080891]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.75, 1, 0.8)
 theme_override_font_sizes/font_size = 11
-theme_override_colors/font_color = Color(0.4, 0.75, 1.0, 0.8)
 text = "█ BIOHAZARD NETWORK PROTOCOL v2.1"
 horizontal_alignment = 1
 
-[node name="Title" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection"]
+[node name="Title" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection" unique_id=2046003727]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 48
-theme_override_colors/font_color = Color(0.95, 0.95, 1.0, 1)
 text = "BIODEATH
 ARENA"
 horizontal_alignment = 1
 
-[node name="SubTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection"]
+[node name="SubTitle" type="Label" parent="MenuContainer/Card/VBoxContainer/TitleSection" unique_id=839506796]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.35, 0.65, 0.95, 0.7)
+theme_override_font_sizes/font_size = 12
 text = "SURVIVAL SHOOTER  |  SOLO + BOTS  |  LAN CO-OP"
 horizontal_alignment = 1
 
-[node name="Separator1" type="HSeparator" parent="MenuContainer/Card/VBoxContainer"]
+[node name="Separator1" type="HSeparator" parent="MenuContainer/Card/VBoxContainer" unique_id=668844358]
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="SoloButton" type="Button" parent="MenuContainer/Card/VBoxContainer"]
-layout_mode = 2
+[node name="SoloButton" type="Button" parent="MenuContainer/Card/VBoxContainer" unique_id=1380603691]
 custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
 text = "🎮  SOLO PLAY  (+ 2 AI ALLIES)"
 
-[node name="MapLabel" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+[node name="MapLabel" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=333280495]
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+theme_override_font_sizes/font_size = 10
 text = "SELECT DEPLOYMENT ZONE"
 horizontal_alignment = 1
 
-[node name="MapSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+[node name="MapSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer" unique_id=1461007900]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="ArenaButton" type="Button" parent="MenuContainer/Card/VBoxContainer/MapSection"]
+[node name="ArenaButton" type="Button" parent="MenuContainer/Card/VBoxContainer/MapSection" unique_id=1526699696]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "○ ARENA CLÁSICA"
 
-[node name="SagreraButton" type="Button" parent="MenuContainer/Card/VBoxContainer/MapSection"]
+[node name="SagreraButton" type="Button" parent="MenuContainer/Card/VBoxContainer/MapSection" unique_id=1578758663]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "○ LA SAGRERA"
 
-[node name="EnemyLabel" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+[node name="EnemyLabel" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=544766485]
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+theme_override_font_sizes/font_size = 10
 text = "SELECT INVASION TYPE"
 horizontal_alignment = 1
 
-[node name="EnemyModeSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+[node name="EnemyModeSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer" unique_id=114837231]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="SkeletonsButton" type="Button" parent="MenuContainer/Card/VBoxContainer/EnemyModeSection"]
+[node name="SkeletonsButton" type="Button" parent="MenuContainer/Card/VBoxContainer/EnemyModeSection" unique_id=1546368215]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "● MODO ESQUELETOS"
 
-[node name="MechasButton" type="Button" parent="MenuContainer/Card/VBoxContainer/EnemyModeSection"]
+[node name="MechasButton" type="Button" parent="MenuContainer/Card/VBoxContainer/EnemyModeSection" unique_id=1475083141]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "○ MODO MECHAS"
 
-[node name="Separator2" type="HSeparator" parent="MenuContainer/Card/VBoxContainer"]
+[node name="Separator2" type="HSeparator" parent="MenuContainer/Card/VBoxContainer" unique_id=1204389034]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="IPSection" type="VBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+[node name="IPSection" type="VBoxContainer" parent="MenuContainer/Card/VBoxContainer" unique_id=1933171891]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="IPLabel" type="Label" parent="MenuContainer/Card/VBoxContainer/IPSection"]
+[node name="IPLabel" type="Label" parent="MenuContainer/Card/VBoxContainer/IPSection" unique_id=412033558]
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(0.5, 0.7, 0.9, 0.7)
+theme_override_font_sizes/font_size = 10
 text = "LAN — SERVER IP ADDRESS"
 
-[node name="IpLineEdit" type="LineEdit" parent="MenuContainer/Card/VBoxContainer/IPSection"]
-layout_mode = 2
+[node name="IpLineEdit" type="LineEdit" parent="MenuContainer/Card/VBoxContainer/IPSection" unique_id=755068169]
 custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
 placeholder_text = "127.0.0.1"
 alignment = 1
 
-[node name="ButtonSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer"]
+[node name="ButtonSection" type="HBoxContainer" parent="MenuContainer/Card/VBoxContainer" unique_id=2113972045]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="HostButton" type="Button" parent="MenuContainer/Card/VBoxContainer/ButtonSection"]
+[node name="HostButton" type="Button" parent="MenuContainer/Card/VBoxContainer/ButtonSection" unique_id=1668791353]
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0, 52)
 text = "⚡  HOST LAN"
 
-[node name="JoinButton" type="Button" parent="MenuContainer/Card/VBoxContainer/ButtonSection"]
+[node name="JoinButton" type="Button" parent="MenuContainer/Card/VBoxContainer/ButtonSection" unique_id=921288067]
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0, 52)
 text = "🌐  JOIN LAN"
 
-[node name="StatusLabel" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+[node name="StatusLabel" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=1962766600]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 11
-theme_override_colors/font_color = Color(0.5, 0.8, 1.0, 1)
 text = "SELECT GAME MODE"
 horizontal_alignment = 1
 
-[node name="Footer" type="Label" parent="MenuContainer/Card/VBoxContainer"]
+[node name="Footer" type="Label" parent="MenuContainer/Card/VBoxContainer" unique_id=1052589064]
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.3, 0.4, 0.5, 0.5)
+theme_override_font_sizes/font_size = 9
 text = "WASD move  |  Numpad shoot  |  LMB fire  |  1/2/3 weapons  |  SPACE magic  |  R reload"
 horizontal_alignment = 1
+
+[node name="HostIPLabel" type="Label" parent="." unique_id=1220473016]
+layout_mode = 0
+theme_override_colors/font_color = Color(0.3, 1, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "Your IP: ---.---.---.---"
+horizontal_alignment = 1
+
+[node name="FindGamesButton" type="Button" parent="." unique_id=1913807300]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 0
+size_flags_horizontal = 3
+text = "🔍  BUSCAR PARTIDAS"

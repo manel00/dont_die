@@ -225,6 +225,8 @@ func _apply_texture(model: Node3D) -> void:
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	
 	for mesh in _find_meshes(model):
+		if mesh.mesh == null:
+			continue
 		# Usar surface_override_material es más robusto para archivos FBX
 		for i in range(mesh.mesh.get_surface_count()):
 			mesh.set_surface_override_material(i, mat)

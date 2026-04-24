@@ -72,7 +72,33 @@ func _load_animations(_anim_path := "") -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	
+	# Rogue se mueve mientras ataca (persigue mientras hace daño)
+	if current_state == State.ATTACK:
+		_move_while_attacking(delta)
+	
 	_update_animation()
+
+func _move_while_attacking(delta: float) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	
+	# Movimiento del 50% de velocidad mientras ataca melee
+	var to_target = target.global_position - global_position
+	var move_dir = Vector3(to_target.x, 0, to_target.z).normalized()
+	var dist = global_position.distance_to(target.global_position)
+	
+	# Sigue persiguiendo mientras ataca
+	if dist > attack_range * 0.8:
+		# Acércate al target
+		velocity = move_dir * move_speed * 0.5
+	elif dist < attack_range * 0.5:
+		# Un pequeño paso atrás para mantener el ritmo de ataque
+		velocity = -move_dir * move_speed * 0.2
+	else:
+		# Strafe mientras ataca
+		var strafe = move_dir.cross(Vector3.UP) * (1 if randf() > 0.5 else -1)
+		velocity = strafe * move_speed * 0.3
 
 func _update_animation() -> void:
 	if not _anim_player:

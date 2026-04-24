@@ -9,6 +9,8 @@ extends Control
 @onready var enemy_skeletons_button: Button = $MenuContainer/Card/VBoxContainer/EnemyModeSection/SkeletonsButton
 @onready var enemy_mechas_button: Button = $MenuContainer/Card/VBoxContainer/EnemyModeSection/MechasButton
 @onready var status_label: Label = $MenuContainer/Card/VBoxContainer/StatusLabel
+@onready var host_ip_label: Label = $HostIPLabel
+@onready var find_games_button: Button = $FindGamesButton
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -19,7 +21,10 @@ func _ready() -> void:
 	map_sagrera_button.pressed.connect(_on_sagrera_selected)
 	enemy_skeletons_button.pressed.connect(_on_skeletons_selected)
 	enemy_mechas_button.pressed.connect(_on_mechas_selected)
+	find_games_button.pressed.connect(_on_find_games_pressed)
 	
+	# Show local IP for reference
+	_update_local_ip_display()
 	# Default selection visual
 	_update_map_selection_visual()
 	_update_enemy_selection_visual()
@@ -91,6 +96,7 @@ func _set_all_buttons_disabled(disabled: bool) -> void:
 	solo_button.disabled = disabled
 	map_arena_button.disabled = disabled
 	map_sagrera_button.disabled = disabled
+	find_games_button.disabled = disabled
 
 func _on_arena_selected() -> void:
 	GameManager.selected_map_path = GameManager.MAP_ARENA
@@ -107,6 +113,34 @@ func _on_skeletons_selected() -> void:
 func _on_mechas_selected() -> void:
 	GameManager.enemy_mode = "mechas"
 	_update_enemy_selection_visual()
+
+func _on_find_games_pressed() -> void:
+	_set_status("SEARCHING FOR GAMES...", Color(0.9, 0.8, 0.3))
+	_set_all_buttons_disabled(true)
+	NetworkManager.discover_servers()
+	await get_tree().create_timer(3.0).timeout
+	var servers := NetworkManager.get_discovered_servers()
+	if servers.size() > 0:
+		var first_ip: String = servers.keys()[0]
+		ip_line_edit.text = first_ip
+		_set_status("FOUND: " + first_ip, Color(0.3, 1.0, 0.5))
+	else:
+		_set_status("NO GAMES FOUND", Color(1.0, 0.5, 0.3))
+	_set_all_buttons_disabled(false)
+
+func _update_local_ip_display() -> void:
+	var local_ips: Array = IP.get_local_addresses()
+	var valid_ip: String = ""
+	for ip: String in local_ips:
+		if ip.begins_with("192.168.") or ip.begins_with("10.") or ip.begins_with("172."):
+			valid_ip = ip
+			break
+	if valid_ip.is_empty() and local_ips.size() > 0:
+		valid_ip = local_ips[0]
+	if not valid_ip.is_empty():
+		host_ip_label.text = "HOST IP: " + valid_ip
+	else:
+		host_ip_label.text = "HOST IP: ---.---.---.---"
 
 func _update_map_selection_visual() -> void:
 	var is_arena = GameManager.selected_map_path == GameManager.MAP_ARENA

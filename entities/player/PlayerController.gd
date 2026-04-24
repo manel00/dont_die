@@ -200,19 +200,13 @@ func _die_from_fall() -> void:
 	if hud and hud.has_method("hide_fall_warning"):
 		hud.hide_fall_warning()
 	
-	# Reset health and respawn at center
-	current_health = max_health
-	if hud: hud.update_health(current_health, max_health)
-	
-	# Respawn at center of map (0, 5, 0) instead of random position
-	global_position = Vector3(0, 5, 0)
-	velocity = Vector3.ZERO
-	
-	# Visual effect for respawn
-	if visual_model:
-		var tw = create_tween().set_parallel(true)
-		tw.tween_property(visual_model, "scale", Vector3.ZERO, 0.1)
-		tw.chain().tween_property(visual_model, "scale", _base_scale, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# FIX: Usar el sistema de muerte del servidor para consistencia multiplayer
+	# En lugar de simplemente resetear la salud, causar daño fatal y dejar que el sistema maneje el respawn
+	if is_multiplayer_authority():
+		take_damage(current_health)  # Daño fatal - dispara respawn automático
+	else:
+		# En cliente, solicitar daño al servidor
+		rpc_id(1, "rpc_take_damage_player", current_health)
 
 func _update_timers(delta: float) -> void:
 	pass  # No cooldowns â€” abilities fire every frame they're pressed
@@ -590,13 +584,13 @@ func rpc_spawn_styloo_projectile(pos: Vector3, dir: Vector3, weapon_type: String
 			# Configurar comportamiento según tipo
 			match weapon_type:
 				"shuriken1", "shuriken2", "shuriken3", "shuriken4":
-					proj.speed = 35.0
+					proj.speed = 45.0
 					proj.life_time = 2.5
 				"kunai":
 					proj.speed = 45.0
 					proj.life_time = 2.0
 				"doubleAxe", "simpleAxe":
-					proj.speed = 18.0
+					proj.speed = 45.0
 					proj.life_time = 4.0
 		
 		_play_shoot_sound()
@@ -1023,7 +1017,7 @@ func _apply_weapon_materials_to_node(node: Node) -> void:
 			mat.roughness = 0.8
 			_shared_styloo_mat = mat
 			
-	if node is MeshInstance3D and _shared_styloo_mat:
+	if node is MeshInstance3D and _shared_styloo_mat and node.mesh:
 		# Usar surface_override_material para asegurar que llega a todos los sub-meshes del FBX
 		for i in range(node.mesh.get_surface_count()):
 			node.set_surface_override_material(i, _shared_styloo_mat)

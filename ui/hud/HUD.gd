@@ -148,15 +148,16 @@ func _on_wave_started(wave_number: int) -> void:
 	tween.tween_property(wave_label, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 
 func update_health(current: int, maximum: int) -> void:
-	if not health_bar: health_bar = $MarginContainer/UILayout/BottomUI/HealthContainer/HealthBar
-	if not health_value: health_value = $MarginContainer/UILayout/BottomUI/HealthContainer/HealthValue
-	if not heart_icon: heart_icon = $MarginContainer/UILayout/BottomUI/HealthContainer/HeartIcon
-	if not damage_overlay: damage_overlay = $DamageOverlay
+	if not health_bar: health_bar = get_node_or_null("MarginContainer/UILayout/BottomUI/HealthContainer/HealthBar")
+	if not health_value: health_value = get_node_or_null("MarginContainer/UILayout/BottomUI/HealthContainer/HealthValue")
+	if not heart_icon: heart_icon = get_node_or_null("MarginContainer/UILayout/BottomUI/HealthContainer/HeartIcon")
+	if not damage_overlay: damage_overlay = get_node_or_null("DamageOverlay")
 	if not health_bar: return
 	
 	health_bar.max_value = maximum
 	health_bar.value = current
-	health_value.text = "%d / %d" % [current, maximum]
+	if health_value:
+		health_value.text = "%d / %d" % [current, maximum]
 	
 	var ratio := float(current) / maximum
 	

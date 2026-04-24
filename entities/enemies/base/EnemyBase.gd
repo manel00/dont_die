@@ -80,6 +80,10 @@ static var _player_cache: Array[Node] = []
 static var _player_cache_timer: float = 0.0
 static var _player_cache_interval: float = 0.5
 
+# Función para limpiar cache de nodos inválidos
+static func _cleanup_player_cache() -> void:
+	_player_cache = _player_cache.filter(func(p): return is_instance_valid(p))
+
 # â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 #  MATERIAL CACHE - Reutilizar materiales para evitar lag
 # â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
@@ -139,9 +143,11 @@ func _ready() -> void:
 	call_deferred("_spawn_effect")
 	
 	# Initialize player cache before finding target (BUG FIX: cache was empty on first use)
+	# Ahora incluye tambiÃ©n bots aliados como targets vÃ¡lidos
 	if _player_cache.is_empty():
 		var all_players := get_tree().get_nodes_in_group("player")
-		_player_cache = all_players.filter(func(p): return is_instance_valid(p))
+		var all_bots := get_tree().get_nodes_in_group("bots")
+		_player_cache = (all_players + all_bots).filter(func(p): return is_instance_valid(p))
 	
 	# Buscar target inmediatamente despuÃ©s de spawnear
 	call_deferred("_find_nearest_target")
@@ -272,18 +278,24 @@ func _physics_process(delta: float) -> void:
 	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 	#  PERFORMANCE: Distance Culling & Batch Updates
 	# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-	# Actualizar cache de jugadores periÃ³dicamente
+	# Actualizar cache de jugadores Y bots periÃ³dicamente
 	_player_cache_timer += delta
 	if _player_cache_timer >= _player_cache_interval:
 		_player_cache_timer = 0.0
 		var all_players := get_tree().get_nodes_in_group("player")
-		_player_cache = all_players.filter(func(p): return is_instance_valid(p))
+		var all_bots := get_tree().get_nodes_in_group("bots")
+		# Combinar jugadores y bots como targets vÃ¡lidos
+		_player_cache = (all_players + all_bots).filter(func(p): return is_instance_valid(p))
 	
 	# Usar cache de jugadores para encontrar referencia
 	if not _player_ref or not is_instance_valid(_player_ref):
 		var valid_players := _player_cache.filter(func(p): return is_instance_valid(p))
 		if valid_players.size() > 0:
 			_player_ref = valid_players[0]
+		else:
+			# No hay jugadores válidos - entrar en estado IDLE
+			current_state = State.IDLE
+			target = null
 	
 	var distance_to_player: float = INF
 	if _player_ref and is_instance_valid(_player_ref):
@@ -298,6 +310,12 @@ func _physics_process(delta: float) -> void:
 			return
 		else:
 			_is_ai_frozen = false
+	else:
+		# Player reference inválido - procesar gravedad básica
+		if not is_on_floor():
+			velocity += get_gravity() * delta
+		move_and_slide()
+		return
 	
 	# En modo offline/solo, tambiÃ©n somos el servidor
 	var is_authority = multiplayer.is_server() or not multiplayer.has_multiplayer_peer()
@@ -537,6 +555,8 @@ func _hit_flash() -> void:
 		return
 	
 	for mesh in meshes:
+		if mesh.mesh == null:
+			continue
 		var original_mat: Material = mesh.get_surface_override_material(0)
 		if not original_mat:
 			original_mat = mesh.material_override
@@ -643,6 +663,7 @@ func _ensure_materials_loaded() -> void:
 	for i in range(MECHA_TEXTURES.size()):
 		var tex = load(MECHA_TEXTURES[i]) as Texture2D
 		var model = load(MECHA_MODELS[i])
+		# FIX: Solo añadir si ambos se cargaron correctamente
 		if tex and model:
 			_mecha_textures.append(tex)
 			_mecha_model_assets.append(model)
@@ -653,6 +674,11 @@ func _ensure_materials_loaded() -> void:
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 			_mecha_materials.append(mat)
+		else:
+			# Añadir null para mantener índices sincronizados
+			_mecha_textures.append(null)
+			_mecha_model_assets.append(null)
+			_mecha_materials.append(null)
 	
 	_materials_loaded = true
 	
@@ -705,6 +731,14 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 	var res = _mecha_model_assets[index]
 	var mecha_node: Node3D = null
 	
+	# FIX: Verificar que el recurso y material no sean null
+	if res == null:
+		return
+	
+	var material = _mecha_materials[index]
+	if material == null:
+		return
+	
 	if res is PackedScene:
 		mecha_node = res.instantiate()
 	elif res is Mesh:
@@ -716,7 +750,6 @@ func _apply_mecha_texture_by_index(index: int) -> void:
 		visual.add_child(mecha_node)
 		
 		# 3. Aplicar material SÓLIDO y OPACO (sentido común: los robots no son fantasmas)
-		var material = _mecha_materials[index]
 		material.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 		material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL

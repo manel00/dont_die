@@ -130,10 +130,12 @@ func _apply_companion_bot_texture() -> void:
 		if mecha_node:
 			visual.add_child(mecha_node)
 			if mecha_node is MeshInstance3D:
-				mecha_node.set_surface_override_material(0, mat)
+				if mecha_node.mesh:
+					mecha_node.set_surface_override_material(0, mat)
 			else:
 				for mi in mecha_node.find_children("*", "MeshInstance3D", true, false):
-					mi.set_surface_override_material(0, mat)
+					if mi.mesh:
+						mi.set_surface_override_material(0, mat)
 			
 			mecha_node.scale = Vector3(1.0, 1.0, 1.0)
 			mecha_node.rotation_degrees = Vector3(0, 180, 0)
@@ -649,7 +651,23 @@ func pickup_styloo_weapon(_weapon_name: String, _data: Dictionary) -> bool:
 	return true
 
 func pickup_weapon(weapon_type: String) -> void:
-	pickup_styloo_weapon(weapon_type, {})
+	# FIX: Registrar el arma recogida y mejorar stats del bot
+	var weapon_data := {}
+	match weapon_type:
+		"shuriken1", "shuriken2", "shuriken3", "shuriken4":
+			weapon_data = {"type": "ranged", "damage": 25, "color": Color.CYAN}
+		"kunai":
+			weapon_data = {"type": "ranged", "damage": 30, "color": Color.PURPLE}
+		"doubleAxe", "simpleAxe":
+			weapon_data = {"type": "ranged_lobber", "damage": 35, "color": Color.ORANGE}
+	
+	# Aplicar mejoras del arma
+	pickup_styloo_weapon(weapon_type, weapon_data)
+	
+	# Reproducir sonido de pickup si existe
+	var am = get_node_or_null("/root/AudioManager")
+	if am and am.has_method("play_level_up"):
+		am.play_level_up()
 
 func _find_anim_player() -> void:
 	if not visual_model: return

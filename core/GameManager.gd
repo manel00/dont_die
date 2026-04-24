@@ -62,3 +62,7 @@ func sync_restart() -> void:
 	# Called on all peers — reset local state per client
 	is_game_over = false
 	current_score = 0
+	player = null
+	get_tree().paused = false
+	# Recargar escena en todos los clientes
+	get_tree().reload_current_scene()

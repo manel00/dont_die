@@ -17,12 +17,15 @@ const ANIM_ATTACK := "Attack"
 func _ready() -> void:
 	super._ready()
 	attack_range = 45.0  # Triple de rango (15.0 * 3)
-	move_speed = 1.6  # 80% mÃ¡s lento
-	max_health = 350  # +75% mÃ¡s vida
+	move_speed = 1.6  # 80% más lento
+	max_health = 350  # +75% más vida
 	current_health = max_health
-	attack_damage = 50  # +43% mÃ¡s daÃ±o
-	score_value = 75  # +50% mÃ¡s puntos por ser miniboss
+	attack_damage = 50  # +43% más daño
+	score_value = 75  # +50% más puntos por ser miniboss
 	attack_cooldown = 1.0  # Disparar cada segundo sin parar (petición usuario)
+	# FIX: Actualizar nav_agent con el nuevo attack_range para que la navegación funcione
+	if nav_agent:
+		nav_agent.target_desired_distance = attack_range
 	_find_anim_player()
 	_setup_staff_visual()
 	_setup_glow()
@@ -71,7 +74,31 @@ func _load_animations(_anim_path := "") -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	
+	# Mage se mueve mientras ataca (nunca se queda quieto)
+	if current_state == State.ATTACK:
+		_move_while_attacking(delta)
+	
 	_update_animation()
+
+func _move_while_attacking(delta: float) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	
+	# Movimiento lento (30% de velocidad) mientras lanza proyectiles
+	var to_target = target.global_position - global_position
+	var move_dir = Vector3(to_target.x, 0, to_target.z).normalized()
+	var dist = global_position.distance_to(target.global_position)
+	
+	# Mantiene distancia de ataque
+	if dist > attack_range * 0.7:
+		velocity = move_dir * move_speed * 0.3
+	elif dist < attack_range * 0.3:
+		velocity = -move_dir * move_speed * 0.2
+	else:
+		# Strafe lateral
+		var strafe = move_dir.cross(Vector3.UP) * (1 if randf() > 0.5 else -1)
+		velocity = strafe * move_speed * 0.25
 
 func _update_animation() -> void:
 	if not _anim_player:

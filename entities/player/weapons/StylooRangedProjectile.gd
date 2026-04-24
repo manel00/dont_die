@@ -49,7 +49,7 @@ func _setup_weapon_behavior() -> void:
 	match weapon_type:
 		"shuriken1", "shuriken2", "shuriken3", "shuriken4":
 			# Shurikens: Rápido, rebota, rotación de voltereta
-			speed = 35.0
+			speed = 45.0
 			damage = 22
 			life_time = 2.5
 			_max_pierce = 0
@@ -65,7 +65,7 @@ func _setup_weapon_behavior() -> void:
 			
 		"doubleAxe", "simpleAxe":
 			# Hachas: Voltereta pesada
-			speed = 35.0
+			speed = 45.0
 			damage = 65
 			life_time = 3.5
 			_max_pierce = 0
@@ -172,6 +172,8 @@ func _apply_projectile_texture(model: Node3D) -> void:
 	
 	var meshes = _find_meshes(model)
 	for mesh in meshes:
+		if mesh.mesh == null:
+			continue
 		for i in range(mesh.mesh.get_surface_count()):
 			mesh.set_surface_override_material(i, mat)
 

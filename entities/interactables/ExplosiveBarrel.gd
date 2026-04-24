@@ -29,9 +29,9 @@ func take_damage(amount: int) -> void:
 	
 	current_health -= amount
 	
-	# Flash visual de daÃ±o
+	# Flash visual de daño
 	var mesh := get_node_or_null("MeshInstance3D") as MeshInstance3D
-	if mesh:
+	if mesh and mesh.mesh:
 		var flash_mat := StandardMaterial3D.new()
 		var pct: float = float(current_health) / max_health
 		flash_mat.albedo_color = Color(1.0, pct * 0.5, 0.0)
@@ -54,7 +54,7 @@ func _trigger_explosion() -> void:
 
 func _blink_effect() -> void:
 	var mesh := get_node_or_null("MeshInstance3D") as MeshInstance3D
-	if not mesh: return
+	if not mesh or not mesh.mesh: return
 	var tween := create_tween().set_loops(int(fuse_time / 0.1))
 	var blink_mat := StandardMaterial3D.new()
 	blink_mat.albedo_color = Color(1, 0.1, 0)

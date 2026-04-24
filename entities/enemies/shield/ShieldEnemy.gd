@@ -39,7 +39,10 @@ func _shoot_energy_ball(move_dir: Vector3) -> void:
 		proj.global_position = global_position + Vector3(0, 1.5, 0)
 		proj.global_position += move_dir * 1.5
 		proj.velocity = move_dir * proj.speed
-		proj.set_surface_override_material(0, material)
+		# Aplicar material al CSGSphere3D hijo (no a Area3D directamente)
+		var csg_sphere := proj.get_node_or_null("CSGSphere3D") as CSGSphere3D
+		if csg_sphere:
+			csg_sphere.material = material
 
 func _find_anim_player() -> void:
 	var visual := get_node_or_null("VisualModel")
