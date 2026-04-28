@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+@onready var ui_layout: VBoxContainer = $MarginContainer/UILayout
 @onready var score_label: Label = $MarginContainer/UILayout/TopBar/ScoreLabel
 @onready var wave_label: Label = $MarginContainer/UILayout/TopBar/WaveLabel
 @onready var ammo_label: Label = $MarginContainer/UILayout/BottomUI/AmmoContainer/AmmoLabel
@@ -15,12 +16,14 @@ extends CanvasLayer
 @onready var enemy_markers: Control = $RadarContainer/RadarCircle/EnemyMarkers
 
 # Labels de estado de bots aliados (opcional — se crean dinámicamente si no existen en la escena)
-var bot_labels: Array[Label] = []
+var bot_entries: Array[Dictionary] = []
+var _bot_panel: PanelContainer = null
+var _bot_list: VBoxContainer = null
 var _enemy_count_label: Label = null
 
 # Radar settings - OPTIMIZED
-const RADAR_RANGE: float = 50.0  # Distance in world units
-const MAX_RADAR_ENEMIES: int = 15  # Limit to prevent lag with 100+ enemies
+const RADAR_RANGE: float = 500.0  # Distance in world units (mostrar todos los enemigos)
+const MAX_RADAR_ENEMIES: int = 50  # Increased to show all enemies
 const RADAR_UPDATE_INTERVAL: float = 0.1  # Update every 0.1s instead of every frame
 var _radar_dots: Array[Panel] = []
 var _player: Node3D = null
@@ -90,53 +93,92 @@ func _create_enemy_counter() -> void:
 		top_bar.add_child(_enemy_count_label)
 
 func _setup_bot_labels() -> void:
-	# Crear mini-labels de estado de bots si se usa modo solo
-	# Se actualizan desde _process
-	pass
+	if _bot_panel and is_instance_valid(_bot_panel):
+		return
+	
+	_bot_panel = PanelContainer.new()
+	_bot_panel.name = "BotStatusPanel"
+	_bot_panel.visible = false
+	
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.04, 0.08, 0.06, 0.84)
+	panel_style.border_color = Color(0.18, 0.72, 0.32, 0.9)
+	panel_style.border_width_left = 1
+	panel_style.border_width_top = 1
+	panel_style.border_width_right = 1
+	panel_style.border_width_bottom = 1
+	panel_style.corner_radius_top_left = 6
+	panel_style.corner_radius_top_right = 6
+	panel_style.corner_radius_bottom_right = 6
+	panel_style.corner_radius_bottom_left = 6
+	_bot_panel.add_theme_stylebox_override("panel", panel_style)
+	
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	_bot_panel.add_child(content)
+	
+	var title := Label.new()
+	title.text = "ALLY STATUS"
+	title.add_theme_font_size_override("font_size", 14)
+	title.modulate = Color(0.72, 1.0, 0.78)
+	content.add_child(title)
+	
+	_bot_list = VBoxContainer.new()
+	_bot_list.name = "BotList"
+	_bot_list.add_theme_constant_override("separation", 4)
+	content.add_child(_bot_list)
+	
+	if ui_layout:
+		# Limitar ancho máximo y evitar expansión horizontal
+		var screen_width = get_viewport().get_visible_rect().size.x
+		_bot_panel.custom_minimum_size = Vector2i(int(screen_width * 0.03), 0)
+		_bot_panel.size = Vector2i(int(screen_width * 0.03), 40)
+		_bot_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN  # No expandir
+		ui_layout.add_child(_bot_panel)
+		ui_layout.move_child(_bot_panel, 1)
 
 func _process(_delta: float) -> void:
-	# Actualizar conteo de enemigos activo
 	if _enemy_count_label:
 		var enemies := get_tree().get_nodes_in_group("enemies")
-		_enemy_count_label.text = "👾 " + str(enemies.size())
+		_enemy_count_label.text = "ENEMIES: " + str(enemies.size())
 	
-	# Sincronizar labels de bots (crear si faltan)
 	var bots := get_tree().get_nodes_in_group("bots")
+	if _bot_panel:
+		_bot_panel.visible = bots.size() > 0
 	
-	# Ajustar cantidad de labels si no coincide con cantidad de bots
-	if bots.size() != bot_labels.size():
-		# Limpiar y regenerar (simple) o añadir faltantes
-		if bots.size() > bot_labels.size():
-			for i in range(bot_labels.size(), bots.size()):
-				add_bot_label(i)
+	while bot_entries.size() < bots.size():
+		add_bot_label(bot_entries.size())
+	while bot_entries.size() > bots.size():
+		var entry_to_remove: Dictionary = bot_entries.pop_back()
+		if entry_to_remove.has("root") and is_instance_valid(entry_to_remove["root"]):
+			entry_to_remove["root"].queue_free()
 	
-	# Actualizar labels existentes
 	for i in range(bots.size()):
-		if i < bot_labels.size():
-			var bot := bots[i] as Node
-			if is_instance_valid(bot) and bot.get("current_health") != null:
-				var hp: int = bot.get("current_health")
-				var max_hp: int = bot.get("max_health") if bot.get("max_health") != null else 100
-				bot_labels[i].text = "🤖 BOT%d: %d/%d" % [i + 1, hp, max_hp]
-				var ratio: float = float(hp) / max(max_hp, 1)
-				bot_labels[i].modulate = Color(1.0, ratio, ratio * 0.5)
-			else:
-				# Si el bot murió, el label se queda pero podemos marcarlo
-				bot_labels[i].text = "🤖 BOT%d: DEAD" % (i + 1)
-				bot_labels[i].modulate = Color.GRAY
+		var entry := bot_entries[i]
+		var bot := bots[i] as Node
+		var name_label := entry["name"] as Label
+		var hp_label := entry["value"] as Label
+		var bar := entry["bar"] as ProgressBar
+		if is_instance_valid(bot) and bot.get("current_health") != null:
+			var hp: int = bot.get("current_health")
+			var max_hp: int = bot.get("max_health") if bot.get("max_health") != null else 100
+			var ratio: float = float(hp) / max(max_hp, 1)
+			name_label.text = "BOT %d" % (i + 1)
+			hp_label.text = "%d / %d" % [hp, max_hp]
+			bar.max_value = max_hp
+			bar.value = hp
+			bar.modulate = Color(0.75 + ratio * 0.25, 1.0, 0.75 + ratio * 0.15)
+		else:
+			name_label.text = "BOT %d" % (i + 1)
+			hp_label.text = "DOWN"
+			bar.max_value = 100
+			bar.value = 0
+			bar.modulate = Color(0.45, 0.45, 0.45)
 	
-	# Update radar (optimized - only every 0.1s, max 15 enemies)
 	_update_radar(_delta)
-	
-	# Update ability cooldowns
 	_update_ability_cooldowns(_delta)
-	
-	# Update kill feed (fade out)
 	_update_kill_feed(_delta)
-	
-	# Update survival time
 	_update_survival_time()
-
 func _on_score_changed(new_score: int) -> void:
 	score_label.text = "SCORE: " + str(new_score)
 
@@ -253,24 +295,71 @@ func update_weapon_name(weapon_name: String) -> void:
 	tween.tween_property(ammo_label, "modulate", Color.WHITE, 0.4)
 
 func add_bot_label(bot_index: int) -> void:
-	var lbl := Label.new()
-	lbl.add_theme_font_size_override("font_size", 12)
-	lbl.text = "🤖 BOT%d: 100/100" % (bot_index + 1)
-	lbl.modulate = Color(0.5, 1.0, 0.6)
-	bot_labels.append(lbl)
-	# Añadir al layout si existe un contenedor de bots
-	var bot_container := get_node_or_null("MarginContainer/UILayout/BotContainer")
-	if bot_container:
-		bot_container.add_child(lbl)
-	else:
-		# Añadir directamente a la capa del canvas
-		add_child(lbl)
-		lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		lbl.position = Vector2(10, 100 + bot_index * 20)
-
-# ═══════════════════════════════════════════════════════════════════
-#  RADAR SYSTEM
-# ═══════════════════════════════════════════════════════════════════
+	if not _bot_list:
+		return
+	
+	var row := PanelContainer.new()
+	row.custom_minimum_size = Vector2i(0, 32)
+	row.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var row_style := StyleBoxFlat.new()
+	row_style.bg_color = Color(0.07, 0.12, 0.09, 0.92)
+	row_style.corner_radius_top_left = 5
+	row_style.corner_radius_top_right = 5
+	row_style.corner_radius_bottom_right = 5
+	row_style.corner_radius_bottom_left = 5
+	row.add_theme_stylebox_override("panel", row_style)
+	
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 2)
+	row.add_child(content)
+	
+	var header := HBoxContainer.new()
+	content.add_child(header)
+	
+	var name_label := Label.new()
+	name_label.text = "BOT %d" % (bot_index + 1)
+	name_label.add_theme_font_size_override("font_size", 12)
+	name_label.modulate = Color(0.75, 1.0, 0.78)
+	header.add_child(name_label)
+	
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(spacer)
+	
+	var hp_label := Label.new()
+	hp_label.text = "100 / 100"
+	hp_label.add_theme_font_size_override("font_size", 11)
+	hp_label.modulate = Color(0.9, 0.98, 0.9)
+	header.add_child(hp_label)
+	
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 10)
+	bar.max_value = 100
+	bar.value = 100
+	bar.show_percentage = false
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.12, 0.18, 0.14, 0.95)
+	bg_style.corner_radius_top_left = 4
+	bg_style.corner_radius_top_right = 4
+	bg_style.corner_radius_bottom_right = 4
+	bg_style.corner_radius_bottom_left = 4
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = Color(0.2, 0.85, 0.32, 1.0)
+	fill_style.corner_radius_top_left = 4
+	fill_style.corner_radius_top_right = 4
+	fill_style.corner_radius_bottom_right = 4
+	fill_style.corner_radius_bottom_left = 4
+	bar.add_theme_stylebox_override("background", bg_style)
+	bar.add_theme_stylebox_override("fill", fill_style)
+	content.add_child(bar)
+	
+	_bot_list.add_child(row)
+	bot_entries.append({
+		"root": row,
+		"name": name_label,
+		"value": hp_label,
+		"bar": bar,
+	})
 func _setup_radar() -> void:
 	# Find the player
 	var players := get_tree().get_nodes_in_group("player")
@@ -280,7 +369,7 @@ func _setup_radar() -> void:
 			break
 	
 	# Create initial pool of radar dots as Panels with rounded style
-	for i in range(20):
+	for i in range(50):
 		var dot := Panel.new()
 		dot.custom_minimum_size = Vector2(8, 8)
 		dot.visible = false

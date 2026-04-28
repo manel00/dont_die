@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://djsmpi1jn7wgv" path="res://levels/arena/Arena.gd" id="1_arena"]
 [ext_resource type="Script" uid="uid://c708qrovvoy3" path="res://levels/arena/EnvironmentController.gd" id="2_env"]
-[ext_resource type="Script" uid="uid://8a302i63imoi" path="res://levels/arena/CityPropsSpawner.gd" id="3_city"]
 [ext_resource type="PackedScene" path="res://ui/hud/HUD.tscn" id="4_hud"]
 [ext_resource type="PackedScene" uid="uid://4phupfu8yd0k" path="res://entities/interactables/StylooWeaponPickup.tscn" id="5_wep"]
 
@@ -35,8 +34,7 @@ glow_bloom = 0.3
 fog_enabled = true
 fog_light_color = Color(0.2, 0.3, 0.4, 1)
 fog_density = 0.005
-volumetric_fog_enabled = true
-volumetric_fog_density = 0.02
+volumetric_fog_enabled = false
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
 size = Vector3(250, 2, 250)
@@ -86,9 +84,6 @@ sun_light = NodePath("../DirectionalLight3D")
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=162198092 groups=["navigation_regions"]]
 navigation_mesh = SubResource("NavigationMesh_1")
-
-[node name="City" type="Node3D" parent="NavigationRegion3D" unique_id=1149816017]
-script = ExtResource("3_city")
 
 [node name="Players" type="Node3D" parent="." unique_id=2021986613]
 

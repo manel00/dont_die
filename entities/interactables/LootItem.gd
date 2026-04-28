@@ -5,6 +5,7 @@ class_name LootItem
 @export var heal_value: int = 25
 
 func _ready() -> void:
+	add_to_group("loot")
 	# FIX: Asegurar collision layers correctas para detectar CharacterBody3D del jugador
 	# Layer 1 = entorno/jugador, configurar monitoreo
 	collision_layer = 0   # El loot no forma parte de ninguna capa fÃ­sica

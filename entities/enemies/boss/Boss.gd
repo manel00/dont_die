@@ -3,9 +3,8 @@ extends EnemyBase
 ## BOSS FINAL - Mecha inteligente con ataques ranged y melee
 ## Persigue jugadores Y bots, nunca se queda quieto
 
-var _attack_timer: float = 0.0
 var _strafe_dir: int = 1
-var projectile_scene: PackedScene
+# projectile_scene ahora se hereda de EnemyBase
 
 var _anim_player: AnimationPlayer = null
 const ANIM_WALK := "Walk"
@@ -30,6 +29,9 @@ func _ready() -> void:
 	# IA muy agresiva
 	flank_chance = 0.7
 	reaction_time = 0.1
+	move_speed = 4.8
+	attack_cooldown = 0.95
+	max_distance_from_player = 120.0
 	
 	# Cargar escena de proyectil
 	projectile_scene = preload("res://entities/player/weapons/Projectile.tscn")
@@ -74,33 +76,33 @@ func _physics_process(delta: float) -> void:
 	if current_state == State.ATTACK:
 		# BOSS NUNCA SE QUEDA QUIETO: movimiento lento mientras ataca
 		_move_while_attacking(delta)
-		_attack_timer -= delta
 	
 	_update_animation()
 
 func _move_while_attacking(delta: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-	
-	# Strafe lateral mientras ataca
+
+	# Boss NUNCA se queda quieto - movimiento activo mientras ataca
 	_strafe_dir = _strafe_dir if randf() > 0.02 else -_strafe_dir
 	var to_target = target.global_position - global_position
 	var move_dir = Vector3(to_target.x, 0, to_target.z).normalized()
 	var strafe = move_dir.cross(Vector3.UP) * _strafe_dir
-	
-	# Mantiene distancia óptima para atacar
 	var dist = global_position.distance_to(target.global_position)
-	var speed_mult = 0.4
-	
-	if dist > attack_range * 0.8:
-		# Acércate si estás muy lejos
+	var speed_mult = 0.7
+
+	if dist > RANGED_MIN_RANGE * 0.9:
+		# Persigue activamente
 		velocity = move_dir * move_speed * speed_mult
-	elif dist < MELEE_RANGE:
-		# Aléjate un poco si estás muy cerca
-		velocity = -move_dir * move_speed * speed_mult * 0.5
+	elif dist < MELEE_RANGE * 0.9:
+		# Mantiene presión en melee
+		velocity = (-move_dir * 0.4 + strafe * 0.8) * move_speed * speed_mult
 	else:
-		# Strafe lateral en rango de ataque
-		velocity = strafe * move_speed * speed_mult * 0.7
+		# Strafe activo en rango
+		velocity = (strafe * 0.8 + move_dir * 0.35) * move_speed * speed_mult
+	
+	if move_dir.length() > 0.01:
+		rotation.y = lerp_angle(rotation.y, atan2(move_dir.x, move_dir.z), 8.0 * delta)
 
 func _update_animation() -> void:
 	if not _anim_player:

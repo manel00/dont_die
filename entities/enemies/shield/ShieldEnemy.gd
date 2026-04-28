@@ -2,7 +2,7 @@ extends EnemyBase
 
 ## ShieldEnemy — ahora es ranged (arquero con escudo)
 
-var projectile_scene := preload("res://entities/player/weapons/Projectile.tscn")
+# projectile_scene ahora se hereda de EnemyBase
 var _attack_timer: float = 0.0
 
 var _anim_player: AnimationPlayer = null

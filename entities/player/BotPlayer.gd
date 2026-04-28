@@ -2,14 +2,13 @@
 ## AI-controlled ally that follows the human player(s) and auto-shoots enemies.
 ## Uses the same weapons system as PlayerController.
 
-class_name BotPlayer
 extends CharacterBody3D
 
 @export_category("Bot Stats")
 @export var max_health: int = 150  # +50% mÃ¡s vida
-@export var move_speed: float = 2.34  # +30%
-@export var attack_range: float = 15.0  # Mayor rango
-@export var fire_rate: float = 0.28  # +25% mÃ¡s rÃ¡pido
+@export var move_speed: float = 3.2  # +60% - más movimiento
+@export var attack_range: float = 20.0  # Mayor rango - más acción
+@export var fire_rate: float = 0.2  # +50% más rápido - más acción
 @export var gravity: float = 20.0
 
 # Combat modes
@@ -26,11 +25,13 @@ var _nearby_weapon: Node3D = null
 
 # IA mejorada
 @export_category("Bot AI")
-@export var kite_speed: float = 2.86  # +30%
+@export var kite_speed: float = 3.5  # +60% - más rápido para escapar
 @export var retreat_health_pct: float = 0.25  # Retirarse al 25% vida
-@export var optimal_distance: float = 10.0  # Distancia Ã³ptima del enemigo
+@export var optimal_distance: float = 12.0  # Distancia óptima del enemigo
 @export var dodge_enabled: bool = true
 @export var support_ally: bool = true  # Ayudar a aliados en peligro
+@export var reaction_time: float = 0.15  # Tiempo de reacción rápido
+@export var erratic_movement: bool = true  # Movimiento errático para parecer humano
 
 var current_health: int = 150
 var _fire_timer: float = 0.0
@@ -43,12 +44,19 @@ var active_weapon: Node3D
 @onready var bot_projectile_scene := preload("res://entities/player/weapons/StylooRangedProjectile.tscn")
 
 # IA avanzada
-enum BotState { IDLE, FOLLOW, CHASE, KITE, RETREAT, SUPPORT }
+enum BotState { IDLE, FOLLOW, CHASE, KITE, RETREAT, SUPPORT, EVADE, FLANK, SEEK_HEALTH }
 var _bot_state: BotState = BotState.IDLE
 var _dodge_direction: Vector3 = Vector3.ZERO
 var _dodge_timer: float = 0.0
 var _support_target: Node3D = null
+var _health_orb_target: Node3D = null
 var _last_melee_target: Node3D = null
+var _attack_anim_timer: float = 0.0
+var _combat_side: int = 1
+var _last_state_change: float = 0.0  # Para variabilidad
+var _idle_wander_timer: float = 0.0  # Movimiento cuando no hay enemigo
+var _facing_direction: Vector3 = Vector3.FORWARD  # Dirección actual de mirada
+var _strafe_timer: float = 0.0  # Timer para cambio de strafe
 
 signal bot_died
 
@@ -58,6 +66,11 @@ const ANIM_IDLE := "Idle"
 const ANIM_WALK := "Walk"
 const ANIM_RUN := "Run"
 const ANIM_ATTACK := "Attack"
+const ATTACK_ANIM_DURATION: float = 0.22
+const ALLY_PROTECTION_RADIUS: float = 8.0
+const COMBAT_REPOSITION_RADIUS: float = 4.5
+const PERSONAL_SPACE_RADIUS: float = 2.2
+const TARGET_STICKINESS_BONUS: float = 6.0
 
 func _ready() -> void:
 	current_health = max_health
@@ -73,6 +86,7 @@ func _ready() -> void:
 	_melee_cooldown = 0.0
 	_fireball_cooldown = 0.0
 	_mode_switch_timer = 2.0  # Switch combat mode every 2 seconds
+	_combat_side = 1 if randi() % 2 == 0 else -1
 	
 	# Find weapon (legacy)
 	for child in get_children():
@@ -182,38 +196,26 @@ func _update_fire_timer(delta: float) -> void:
 		_fireball_cooldown -= delta
 	if _mode_switch_timer > 0.0:
 		_mode_switch_timer -= delta
+	if _attack_anim_timer > 0.0:
+		_attack_anim_timer = max(_attack_anim_timer - delta, 0.0)
 
 func _update_targets() -> void:
 	# Find enemies with priority (Mage > Rogue > Base > Minion)
 	var enemies := get_tree().get_nodes_in_group("enemies")
 	var best_target: Node3D = null
 	var best_score: float = INF
+	_support_target = null
 	
 	for e in enemies:
-		if not e is Node3D:
+		if not _is_alive_actor(e):
 			continue
 		var enemy = e as Node3D
 		var d: float = global_position.distance_to(enemy.global_position)
-		if d > 30.0:  # Ignorar enemigos muy lejanos
+		if d > 50.0:  # Detectar enemigos más lejos - más reacción
 			continue
 		
 		# Calcular puntuaciÃ³n de prioridad (menor = mejor)
-		var score = d
-		# Priorizar enemigos peligrosos
-		if enemy.has_method("get_max_health"):
-			var enemy_max_hp = enemy.get("max_health")
-			if enemy_max_hp == null:
-				enemy_max_hp = 100
-			if enemy_max_hp > 200:  # Mage/Boss
-				score -= 15.0
-			elif enemy_max_hp > 150:  # Rogue
-				score -= 8.0
-			elif enemy_max_hp > 100:  # Base
-				score -= 3.0
-		# Priorizar enemigos que atacan a aliados cercanos
-		if _is_targeting_ally(enemy):
-			score -= 10.0
-		
+		var score = _score_enemy(enemy)
 		if score < best_score:
 			best_score = score
 			best_target = enemy
@@ -225,7 +227,7 @@ func _update_targets() -> void:
 	var nearest_human_dist: float = INF
 	_follow_target = null
 	for h in humans:
-		if h == self or h.is_in_group("bots"):
+		if not _is_alive_actor(h) or h == self or h.is_in_group("bots"):
 			continue
 		var d: float = global_position.distance_to((h as Node3D).global_position)
 		if d < nearest_human_dist:
@@ -236,7 +238,7 @@ func _update_targets() -> void:
 	if _follow_target == null:
 		var bots := get_tree().get_nodes_in_group("bots")
 		for b in bots:
-			if b == self or not (b is Node3D): continue
+			if not _is_alive_actor(b) or b == self: continue
 			var d: float = global_position.distance_to((b as Node3D).global_position)
 			if d < 8.0 and d < nearest_human_dist:
 				nearest_human_dist = d
@@ -247,7 +249,7 @@ func _update_targets() -> void:
 		var bots := get_tree().get_nodes_in_group("bots")
 		var lowest_health_pct: float = 1.0
 		for b in bots:
-			if b == self or not (b is Node3D): continue
+			if not _is_alive_actor(b) or b == self: continue
 			var bot = b as Node3D
 			var bot_hp = bot.get("current_health")
 			if bot_hp == null:
@@ -284,21 +286,97 @@ func _find_nearest_weapon() -> Node3D:
 				nearest = wp as Node3D
 	return nearest
 
+func _is_alive_actor(node: Node) -> bool:
+	if not (node is Node3D) or not is_instance_valid(node):
+		return false
+	var hp = node.get("current_health")
+	if hp != null and int(hp) <= 0:
+		return false
+	return true
+
+func _score_enemy(enemy: Node3D) -> float:
+	var score := global_position.distance_to(enemy.global_position)
+	var enemy_max_hp = enemy.get("max_health")
+	if enemy_max_hp == null:
+		enemy_max_hp = 100
+	if enemy_max_hp > 1000:
+		score -= 18.0
+	elif enemy_max_hp > 250:
+		score -= 12.0
+	elif enemy_max_hp > 150:
+		score -= 7.0
+	elif enemy_max_hp > 100:
+		score -= 3.0
+	if enemy == _target_enemy:
+		score -= TARGET_STICKINESS_BONUS
+	var enemy_target = enemy.get("target")
+	if enemy_target != null and enemy_target is Node3D:
+		if enemy_target == _follow_target:
+			score -= 12.0
+		elif enemy_target.is_in_group("bots"):
+			score -= 8.0
+	if _follow_target and global_position.distance_to(_follow_target.global_position) <= ALLY_PROTECTION_RADIUS:
+		var pressure_dist = enemy.global_position.distance_to(_follow_target.global_position)
+		if pressure_dist < ALLY_PROTECTION_RADIUS:
+			score -= (ALLY_PROTECTION_RADIUS - pressure_dist) * 1.6
+	return score
+
+func _get_follow_slot(anchor: Node3D) -> Vector3:
+	var base_offset := Vector3(_combat_side * PERSONAL_SPACE_RADIUS, 0, -2.5)
+	if _target_enemy and is_instance_valid(_target_enemy):
+		var to_enemy = _target_enemy.global_position - anchor.global_position
+		to_enemy.y = 0.0
+		if to_enemy.length() > 0.1:
+			var forward = to_enemy.normalized()
+			var side = forward.cross(Vector3.UP).normalized() * _combat_side
+			return anchor.global_position - forward * 2.4 + side * PERSONAL_SPACE_RADIUS
+	return anchor.global_position + base_offset
+
+func _get_combat_position(enemy: Node3D, desired_distance: float) -> Vector3:
+	var to_enemy = enemy.global_position - global_position
+	to_enemy.y = 0.0
+	if to_enemy.length() < 0.1:
+		to_enemy = Vector3.FORWARD
+	var forward = to_enemy.normalized()
+	var side = forward.cross(Vector3.UP).normalized() * _combat_side
+	var anchor = enemy.global_position - forward * desired_distance + side * COMBAT_REPOSITION_RADIUS
+	if _follow_target and is_instance_valid(_follow_target):
+		anchor = anchor.lerp(_get_follow_slot(_follow_target), 0.18)
+	return anchor
+
 func _evaluate_bot_state() -> void:
-	# Evaluar estado del bot
+	# Evaluar estado del bot con más variabilidad humana
 	var health_pct = float(current_health) / max_health
+	var time_since_change = Time.get_ticks_msec() / 1000.0 - _last_state_change
 	
 	# Pick up weapon if nearby
-	if _nearby_weapon:
-		_bot_state = BotState.FOLLOW  # Will move toward weapon
+	if _nearby_weapon and (_target_enemy == null or global_position.distance_to(_target_enemy.global_position) > optimal_distance):
+		_bot_state = BotState.FOLLOW
 		return
 	
-	# Retirarse si vida baja
+	# Buscar health orb si vida <= 20
+	if current_health <= 20:
+		var loot_items = get_tree().get_nodes_in_group("loot")
+		var closest_orb: Node3D = null
+		var closest_dist: float = 50.0  # Radio de 50 metros
+		for item in loot_items:
+			if item is Node3D and is_instance_valid(item):
+				var dist = global_position.distance_to(item.global_position)
+				if dist < closest_dist:
+					closest_dist = dist
+					closest_orb = item
+		if closest_orb:
+			_health_orb_target = closest_orb
+			_bot_state = BotState.SEEK_HEALTH
+			return
+	
+	# Retirarse si vida baja - pero a veces arriesgar
 	if health_pct < retreat_health_pct:
-		_bot_state = BotState.RETREAT
-		return
+		if randf() > 0.15:  # 15% de chance de arriesgar aunque tenga poca vida
+			_bot_state = BotState.RETREAT
+			return
 	
-	# Apoyar aliado en peligro
+	# Apoyar aliado en peligro - más sensible
 	if support_ally and _support_target and _support_target != self:
 		var ally_hp = _support_target.get("current_health")
 		if ally_hp == null:
@@ -306,34 +384,51 @@ func _evaluate_bot_state() -> void:
 		var ally_max_hp = _support_target.get("max_health")
 		if ally_max_hp == null:
 			ally_max_hp = 150
-		if float(ally_hp) / ally_max_hp < 0.4:
+		# Apoyar si aliado tiene menos del 50%
+		if float(ally_hp) / ally_max_hp < 0.5:
 			_bot_state = BotState.SUPPORT
 			return
 	
 	# Update combat mode based on distance
 	_update_combat_mode()
 	
-	# Kiting: mantener distancia Ã³ptima
+	# Kiting: mantener distancia óptima - con variabilidad
 	if _target_enemy:
 		var dist_to_enemy = global_position.distance_to(_target_enemy.global_position)
+		
+		# Chance aleatoria de flanquear si está en rango
+		if dist_to_enemy < optimal_distance * 1.5 and dist_to_enemy > 3.0 and erratic_movement:
+			if randf() < 0.08:  # 8% chance por frame
+				_combat_side = -_combat_side  # Cambiar lado de combate
+				_strafe_timer = 1.5 + randf()  # Strafe durante 1.5-2.5 segundos
+				_bot_state = BotState.FLANK
+				_last_state_change = Time.get_ticks_msec() / 1000.0
+				return
+		
 		if _current_combat_mode == CombatMode.MELEE:
 			# For melee, get close
-			if dist_to_enemy > 3.0:
-				_bot_state = BotState.CHASE
+			_bot_state = BotState.CHASE
+		elif dist_to_enemy < optimal_distance * 0.4:
+			# Muito perto - kite back com chance de evasion
+			if randf() < 0.1:
+				_bot_state = BotState.EVADE  # Evasión agresiva
 			else:
-				_bot_state = BotState.CHASE  # Stay close for melee
-		elif dist_to_enemy < optimal_distance * 0.5 and _current_combat_mode == CombatMode.RANGED:
-			# Muy cerca for ranged - kite back
-			_bot_state = BotState.KITE
+				_bot_state = BotState.KITE
 			return
-		elif dist_to_enemy > attack_range * 1.2:
+		elif dist_to_enemy > attack_range * 0.9:
 			# Lejos - chase
 			_bot_state = BotState.CHASE
 			return
 		else:
-			# En rango Ã³ptimo - mantener posiciÃ³n
-			_bot_state = BotState.CHASE
+			# En rango óptimo - con variabilidad
+			if erratic_movement and randf() < 0.05:
+				# Ocasionalmente cambiar a strafe
+				_bot_state = BotState.FLANK
+				_strafe_timer = 0.8 + randf() * 1.2
+			else:
+				_bot_state = BotState.CHASE
 	else:
+		# Sin enemigo - comportamiento idle con movimiento
 		_bot_state = BotState.FOLLOW
 
 func _update_combat_mode() -> void:
@@ -343,9 +438,13 @@ func _update_combat_mode() -> void:
 		var dist = global_position.distance_to(_target_enemy.global_position)
 		
 		# Choose mode based on distance
-		if dist < 4.0:
-			# Close range - prefer melee
-			_current_combat_mode = CombatMode.MELEE if randf() > 0.3 else CombatMode.FIREBALL
+		if current_health < int(max_health * 0.4):
+			if dist < 8.0:
+				_current_combat_mode = CombatMode.FIREBALL if randf() > 0.35 else CombatMode.RANGED
+			else:
+				_current_combat_mode = CombatMode.RANGED
+		elif dist < 4.0:
+			_current_combat_mode = CombatMode.MELEE if randf() > 0.2 else CombatMode.FIREBALL
 		elif dist < 10.0:
 			# Medium range - mix of all
 			var r = randf()
@@ -362,97 +461,127 @@ func _update_combat_mode() -> void:
 func _move(delta: float) -> void:
 	_evaluate_bot_state()
 	
-	var move_to_node: Node3D = null
+	var has_move_target := false
+	var move_target_position := Vector3.ZERO
 	var actual_speed = move_speed
 	
-	# Actualizar timers de dodge
 	if _dodge_timer > 0:
 		_dodge_timer -= delta
 	
-	# Handle weapon pickup
 	if _nearby_weapon and _bot_state == BotState.FOLLOW:
 		var dist_to_weapon = global_position.distance_to(_nearby_weapon.global_position)
 		if dist_to_weapon < 1.5:
-			# Pick up the weapon
 			if _nearby_weapon.has_method("pickup"):
 				_nearby_weapon.pickup(self)
 			_nearby_weapon = null
 		else:
-			move_to_node = _nearby_weapon
+			has_move_target = true
+			move_target_position = _nearby_weapon.global_position
 			actual_speed = kite_speed
 	
 	match _bot_state:
 		BotState.KITE:
-			# Hacer kiting - alejarse del enemigo mientras disparas
 			if _target_enemy:
 				var to_enemy = _target_enemy.global_position - global_position
 				var retreat_dir = -Vector3(to_enemy.x, 0, to_enemy.z).normalized()
-				
-				# AÃ±adir movimiento lateral para evitar ser alcanzado
 				var strafe = retreat_dir.cross(Vector3.UP) * (1 if randf() > 0.5 else -1)
 				var move_dir = (retreat_dir * 0.7 + strafe * 0.3).normalized()
-				
 				actual_speed = kite_speed
 				velocity.x = move_dir.x * actual_speed
 				velocity.z = move_dir.z * actual_speed
-			
+		
+		BotState.EVADE:
+			# Evasión agresiva - movimiento rápido en dirección aleatoria
+			if _target_enemy:
+				var to_enemy = _target_enemy.global_position - global_position
+				var retreat_dir = -Vector3(to_enemy.x, 0, to_enemy.z).normalized()
+				# Evasión en ángulo de 45-90 grados
+				var strafe = retreat_dir.cross(Vector3.UP) * (1.0 if randf() > 0.5 else -1.0)
+				var move_dir = (retreat_dir * 0.5 + strafe * 0.8).normalized()
+				actual_speed = kite_speed * 1.3  # Más rápido al evadir
+				velocity.x = move_dir.x * actual_speed
+				velocity.z = move_dir.z * actual_speed
+		
+		BotState.FLANK:
+			# Flanquear al enemigo por los lados
+			_strafe_timer -= delta
+			if _target_enemy and _strafe_timer > 0:
+				var to_enemy = _target_enemy.global_position - global_position
+				var move_dir = Vector3(to_enemy.x, 0, to_enemy.z).normalized()
+				var strafe_dir = move_dir.cross(Vector3.UP).normalized() * _combat_side
+				# Moverse lateralmente mientras se acerca un poco
+				var flank_dir = (strafe_dir * 0.7 + move_dir * 0.3).normalized()
+				actual_speed = move_speed * 0.85
+				velocity.x = flank_dir.x * actual_speed
+				velocity.z = flank_dir.z * actual_speed
+			else:
+				# Terminar flanqueo
+				_bot_state = BotState.CHASE
+		
 		BotState.RETREAT:
-			# Ir hacia el jugador para protegerse
 			if _follow_target:
-				move_to_node = _follow_target
-				actual_speed = kite_speed  # MÃ¡s rÃ¡pido al retirarse
-			
-		BotState.SUPPORT:
-			# Ir hacia el aliado que necesita ayuda
-			if _support_target:
-				move_to_node = _support_target
+				has_move_target = true
+				move_target_position = _get_follow_slot(_follow_target)
 				actual_speed = kite_speed
-			
+		
+		BotState.SUPPORT:
+			if _support_target:
+				has_move_target = true
+				move_target_position = _get_follow_slot(_support_target)
+				actual_speed = kite_speed
+		
+		BotState.SEEK_HEALTH:
+			if _health_orb_target and is_instance_valid(_health_orb_target):
+				has_move_target = true
+				move_target_position = _health_orb_target.global_position
+				actual_speed = kite_speed * 1.2  # Moverse más rápido hacia el health orb
+		
 		BotState.CHASE:
-			# Perseguir enemigo - adjust distance based on combat mode
 			if _target_enemy:
 				var dist_to_enemy = global_position.distance_to(_target_enemy.global_position)
 				var target_dist = optimal_distance
 				if _current_combat_mode == CombatMode.MELEE:
-					target_dist = 2.5  # Get very close for melee
+					target_dist = 2.5
 				elif _current_combat_mode == CombatMode.FIREBALL:
 					target_dist = 8.0
 				
 				if dist_to_enemy > target_dist:
-					move_to_node = _target_enemy
+					has_move_target = true
+					move_target_position = _target_enemy.global_position
 				elif dist_to_enemy < target_dist * 0.7 and _current_combat_mode != CombatMode.MELEE:
-					# Too close for ranged, back up
-					var to_enemy = _target_enemy.global_position - global_position
-					var retreat_dir = -Vector3(to_enemy.x, 0, to_enemy.z).normalized()
+					var retreat_to_enemy = _target_enemy.global_position - global_position
+					var retreat_dir = -Vector3(retreat_to_enemy.x, 0, retreat_to_enemy.z).normalized()
 					velocity.x = retreat_dir.x * kite_speed * 0.5
 					velocity.z = retreat_dir.z * kite_speed * 0.5
 					return
-			
+		
 		BotState.FOLLOW:
-			# Follow player - stay close
 			if _follow_target:
 				var dist_to_player = global_position.distance_to(_follow_target.global_position)
-				if dist_to_player > 4.0:  # Stay within 4 units
-					move_to_node = _follow_target
-			elif _target_enemy == null:
-				# No target, patrol near player
-				if _follow_target:
-					var patrol_offset = Vector3(randf() - 0.5, 0, randf() - 0.5) * 3.0
-					var patrol_target = _follow_target.global_position + patrol_offset
-					var to_patrol = (patrol_target - global_position).normalized()
-					velocity.x = to_patrol.x * move_speed * 0.3
-					velocity.z = to_patrol.z * move_speed * 0.3
-					return
+				# Movimiento idle más activo - patrulla alrededor del jugador
+				if dist_to_player > 4.0:
+					has_move_target = true
+					move_target_position = _get_follow_slot(_follow_target)
+				elif _target_enemy == null:
+					# Movimiento de patrulla cuando no hay enemigo
+					_idle_wander_timer += delta
+					if _idle_wander_timer > 2.0:
+						_idle_wander_timer = 0.0
+						# Nuevo punto de patrulla aleatorio
+						var patrol_offset = Vector3(randf() - 0.5, 0, randf() - 0.5) * 5.0
+						var patrol_target = _follow_target.global_position + patrol_offset
+						var to_patrol = (patrol_target - global_position).normalized()
+						velocity.x = to_patrol.x * move_speed * 0.4
+						velocity.z = to_patrol.z * move_speed * 0.4
+						return
 	
-	# Aplicar movimiento
-	if move_to_node:
-		nav_agent.target_position = move_to_node.global_position
+	if has_move_target:
+		nav_agent.target_position = move_target_position
 		var next_pos := nav_agent.get_next_path_position()
 		var dir := (next_pos - global_position).normalized()
 		dir.y = 0.0
 		velocity.x = dir.x * actual_speed
 		velocity.z = dir.z * actual_speed
-		
 		if visual_model and dir.length() > 0.1:
 			var rot := atan2(dir.x, dir.z)
 			visual_model.rotation.y = lerp_angle(visual_model.rotation.y, rot, 15.0 * delta)
@@ -461,12 +590,10 @@ func _move(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, actual_speed * delta * 5.0)
 		velocity.z = move_toward(velocity.z, 0.0, actual_speed * delta * 5.0)
 	
-	# EvasiÃ³n: detectar proyectiles entrantes
 	if dodge_enabled:
 		_try_dodge(delta)
 	
 	_update_animation()
-
 func _try_dodge(delta: float) -> void:
 	# Buscar proyectiles cercanos del enemigo (en grupo 'projectiles')
 	var projectiles := get_tree().get_nodes_in_group("projectiles")
@@ -537,12 +664,18 @@ func _try_melee_attack() -> void:
 		return
 	
 	_melee_cooldown = 0.8  # Melee cooldown
+	var attack_dir := (_target_enemy.global_position - global_position).normalized()
+	if visual_model:
+		var flat_dir := Vector3(attack_dir.x, 0, attack_dir.z).normalized()
+		if flat_dir.length() > 0.01:
+			visual_model.rotation.y = atan2(flat_dir.x, flat_dir.z)
+	_play_attack_animation()
 	
 	# Create melee slash effect
 	if multiplayer.is_server():
 		var slash_pos = (global_position + _target_enemy.global_position) / 2.0
 		slash_pos.y = global_position.y + 1.0
-		_rpc_spawn_melee_slash.rpc(slash_pos, _target_enemy.global_position - global_position)
+		_rpc_spawn_melee_slash.rpc(slash_pos, attack_dir)
 	
 	# Deal damage directly
 	var enemy = _target_enemy
@@ -693,12 +826,13 @@ func _update_animation() -> void:
 	var speed = Vector2(velocity.x, velocity.z).length()
 	var is_moving = speed > 0.5
 	
+	if _attack_anim_timer > 0.0:
+		if _anim_player.has_animation(ANIM_ATTACK) and _anim_player.current_animation != ANIM_ATTACK:
+			_anim_player.play(ANIM_ATTACK)
+		return
+	
 	if is_moving:
-		if _target_enemy and global_position.distance_to(_target_enemy.global_position) < attack_range:
-			# In attack range - play attack
-			if _anim_player.has_animation(ANIM_ATTACK) and _anim_player.current_animation != ANIM_ATTACK:
-				_anim_player.play(ANIM_ATTACK)
-		elif _anim_player.has_animation(ANIM_RUN):
+		if _anim_player.has_animation(ANIM_RUN):
 			if _anim_player.current_animation != ANIM_RUN:
 				_anim_player.play(ANIM_RUN)
 		elif _anim_player.has_animation(ANIM_WALK):
@@ -707,6 +841,16 @@ func _update_animation() -> void:
 	else:
 		if _anim_player.has_animation(ANIM_IDLE) and _anim_player.current_animation != ANIM_IDLE:
 			_anim_player.play(ANIM_IDLE)
+
+func _play_attack_animation() -> void:
+	_attack_anim_timer = ATTACK_ANIM_DURATION
+	if _anim_player and _anim_player.has_animation(ANIM_ATTACK):
+		_anim_player.play(ANIM_ATTACK)
+	if visual_model:
+		var initial_scale := visual_model.scale
+		var tween := create_tween()
+		tween.tween_property(visual_model, "scale", initial_scale * 1.12, 0.05)
+		tween.tween_property(visual_model, "scale", initial_scale, 0.14)
 
 func take_damage(amount: int) -> void:
 	current_health = clamp(current_health - amount, 0, max_health)

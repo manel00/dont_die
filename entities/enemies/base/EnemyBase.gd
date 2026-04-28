@@ -38,9 +38,12 @@ var _strafe_direction: int = 1
 var _attack_cooldown: float = 0.0
 var _is_flanking: bool = false
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# Escena de proyectil para ataques a distancia (mechas)
+var projectile_scene: PackedScene = preload("res://entities/player/weapons/Projectile.tscn")
+
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #  MECHA TEXTURES SYSTEM
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const MECHA_TEXTURES: Array[String] = [
 	"res://assets/models/characters/Enemies_mecha/Arachnoid.png",
 	"res://assets/models/characters/Enemies_mecha/Companion-bot.png",
@@ -267,6 +270,9 @@ func _fix_health_bar_for_mecha() -> void:
 	)
 	_is_mecha_active = true
 	
+	# Mechas tienen rango de ataque a distancia
+	attack_range = 25.0
+	
 	# Forzar actualización inicial
 	_update_health_bar()
 
@@ -301,8 +307,12 @@ func _physics_process(delta: float) -> void:
 	if _player_ref and is_instance_valid(_player_ref):
 		distance_to_player = global_position.distance_to(_player_ref.global_position)
 		
-		# Distance culling: freeze AI for far enemies
-		if distance_to_player > DISTANCE_CULLING_THRESHOLD:
+		# Distance culling: freeze AI for far enemies (enemies ranged pueden estar más lejos)
+		var culling_threshold = DISTANCE_CULLING_THRESHOLD
+		if attack_range > 10.0:  # Enemigos ranged pueden operar a mayor distancia
+			culling_threshold = 150.0
+		
+		if distance_to_player > culling_threshold:
 			_is_ai_frozen = true
 			if not is_on_floor():
 				velocity += get_gravity() * delta
@@ -373,6 +383,7 @@ func _handle_state_machine(delta: float) -> void:
 	_reaction_timer += delta
 	if _reaction_timer >= reaction_time:
 		_reaction_timer = 0.0
+		_refresh_target()
 		_evaluate_state()
 	
 	match current_state:
@@ -442,7 +453,11 @@ func _handle_state_machine(delta: float) -> void:
 				return
 				
 			var dist = global_position.distance_to(target.global_position)
-			if dist > attack_range + 0.5:
+			# Enemigos ranged (attack_range > 10) se quedan en ATTACK para atacar consistentemente
+			if attack_range <= 10.0 and dist > attack_range + 0.5:
+				current_state = State.CHASE
+			elif attack_range > 10.0 and dist > attack_range * 1.5:
+				# Ranged: permitir más distancia antes de perseguir
 				current_state = State.CHASE
 			else:
 				# El ataque ahora se gestiona en _physics_process para precisión frame-perfect
@@ -485,23 +500,102 @@ func _find_nearest_target() -> void:
 		target = null
 		return
 	
-	var nearest_dist := INF
+	var best_score := INF
 	var nearest_player: Node3D = null
 	
 	for p in _player_cache:
 		if not is_instance_valid(p):
 			continue
-		var d = global_position.distance_to(p.global_position)
-		if d < nearest_dist:
-			nearest_dist = d
+		var score = _score_target_candidate(p)
+		if score < best_score:
+			best_score = score
 			nearest_player = p
 	
 	if nearest_player != null:
 		target = nearest_player
 		current_state = State.CHASE
 
+func _refresh_target() -> void:
+	var previous_target := target
+	var is_miniboss = max_health > 100
+	
+	# MINIBOSS: Cambiar target más frecuentemente para ser más agresivo
+	var target_switch_bonus = 0.0
+	if is_miniboss:
+		# Los minibosses cambian de target más fácilmente
+		if randf() < 0.35:  # 35% chance de cambiar aunque el anterior esté cerca
+			target_switch_bonus = -15.0
+	
+	_find_nearest_target()
+	
+	# MINIBOSS: Más propenso a cambiar de target
+	if previous_target != null and is_instance_valid(previous_target) and target != null and is_instance_valid(target):
+		var previous_dist = global_position.distance_to(previous_target.global_position)
+		var new_dist = global_position.distance_to(target.global_position)
+		# Los minibosses cambian más fácil si hay algo mejor
+		var switch_threshold = 2.0 if is_miniboss else 2.0
+		if previous_dist <= new_dist + switch_threshold and target_switch_bonus == 0.0:
+			target = previous_target
+
+func _score_target_candidate(candidate: Node3D) -> float:
+	var score := global_position.distance_to(candidate.global_position)
+	var hp = candidate.get("current_health")
+	var max_hp = candidate.get("max_health")
+	if hp != null and max_hp != null and int(max_hp) > 0:
+		var hp_pct = float(hp) / float(max_hp)
+		score -= (1.0 - hp_pct) * 4.0
+	
+	# MINIBOSS: También priorizar bots aliados como targets
+	var is_miniboss = max_health > 100
+	if is_miniboss and candidate.is_in_group("bots"):
+		# Los minibosses prefieren atacar bots que estén cerca
+		score -= 8.0
+		# Pero solo si el bot está relativamente cerca
+		if score > 50.0:
+			score += 50.0  # Ignorar bots lejanos
+	
+	return score
+
 func _perform_attack() -> void:
-	pass
+	# Si es un mecha, disparar proyectil
+	if _is_mecha_active:
+		if target == null:
+			return
+		
+		# Mirar al target
+		var dir := global_position.direction_to(target.global_position)
+		var move_dir := Vector3(dir.x, 0, dir.z).normalized()
+		rotation.y = atan2(move_dir.x, move_dir.z)
+		
+		# Disparar proyectil mecha
+		_shoot_mecha_projectile(move_dir)
+
+## Dispara un proyectil mecha (naranja/metálico)
+func _shoot_mecha_projectile(move_dir: Vector3) -> void:
+	if not projectile_scene:
+		return
+	
+	var proj = projectile_scene.instantiate()
+	proj.scale = Vector3(1.5, 1.5, 1.5)
+	proj.hit_group = "player"
+	proj.damage = int(attack_damage * damage_multiplier * 0.7)  # 70% del daño melee
+	proj.speed = 20.0
+	
+	# Color metálico naranja para mechas
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.9, 0.5, 0.1)
+	material.emission_enabled = true
+	material.emission = Color(0.8, 0.3, 0.0)
+	material.emission_energy_multiplier = 2.0
+	
+	var scene := get_tree().current_scene
+	if not scene:
+		proj.queue_free()
+		return
+	
+	scene.add_child(proj)
+	proj.global_position = global_position + Vector3(0, 1.2, 0) + move_dir * 1.5
+	proj.direction = move_dir
 
 @rpc("authority", "call_local")
 func rpc_sync_health(new_hp: int, damage_taken: int) -> void:

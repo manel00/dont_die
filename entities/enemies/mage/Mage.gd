@@ -4,7 +4,7 @@ extends EnemyBase
 ## MINIBOSS: Ataque a distancia con proyectiles elementales (hielo, fuego, electric)
 
 # El attack_cooldown ahora se hereda de EnemyBase
-var projectile_scene := preload("res://entities/player/weapons/Projectile.tscn")
+# projectile_scene ahora se hereda de EnemyBase
 
 # Elemental projectile types
 enum ElementalType { ICE, FIRE, ELECTRIC }
@@ -22,8 +22,12 @@ func _ready() -> void:
 	current_health = max_health
 	attack_damage = 25  # Daño base para hacer 30 con multiplicador
 	score_value = 75  # +50% más puntos por ser miniboss
-	attack_cooldown = 1.0  # Disparar cada segundo sin parar (petición usuario)
+	attack_cooldown = 2.0  # Disparar cada 2 segundos
 	# FIX: Actualizar nav_agent con el nuevo attack_range para que la navegación funcione
+	move_speed = 3.1
+	reaction_time = 0.12
+	flank_chance = 0.55
+	max_distance_from_player = 90.0
 	if nav_agent:
 		nav_agent.target_desired_distance = attack_range
 	_find_anim_player()
@@ -84,21 +88,28 @@ func _physics_process(delta: float) -> void:
 func _move_while_attacking(delta: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-	
-	# Movimiento lento (30% de velocidad) mientras lanza proyectiles
+
 	var to_target = target.global_position - global_position
 	var move_dir = Vector3(to_target.x, 0, to_target.z).normalized()
 	var dist = global_position.distance_to(target.global_position)
-	
-	# Mantiene distancia de ataque
-	if dist > attack_range * 0.7:
-		velocity = move_dir * move_speed * 0.3
-	elif dist < attack_range * 0.3:
-		velocity = -move_dir * move_speed * 0.2
+	var strafe_dir = move_dir.cross(Vector3.UP).normalized()
+	if strafe_dir == Vector3.ZERO:
+		strafe_dir = Vector3.RIGHT
+
+	# Movimiento activo mientras ataca - nunca quedarse quieto
+	if dist > attack_range * 0.55:
+		# Persigue activamente
+		velocity = move_dir * move_speed * 0.95
+	elif dist < attack_range * 0.2:
+		# Retrocede un poco
+		velocity = (-move_dir + strafe_dir * 0.35) * move_speed * 0.6
 	else:
-		# Strafe lateral
-		var strafe = move_dir.cross(Vector3.UP) * (1 if randf() > 0.5 else -1)
-		velocity = strafe * move_speed * 0.25
+		# Strafe activo con variación
+		var strafe_sign = 1.0 if sin(Time.get_ticks_msec() * 0.004) >= 0.0 else -1.0
+		velocity = (strafe_dir * strafe_sign + move_dir * 0.25) * move_speed * 0.7
+	
+	if move_dir.length() > 0.01:
+		rotation.y = lerp_angle(rotation.y, atan2(move_dir.x, move_dir.z), 10.0 * delta)
 
 func _update_animation() -> void:
 	if not _anim_player:

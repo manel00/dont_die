@@ -1,4 +1,3 @@
-class_name PlayerController
 extends CharacterBody3D
 
 @export_category("Stats")
@@ -51,6 +50,14 @@ const WEAPON_USES_DEFAULT: int = 5
 var _base_scale: Vector3 = Vector3.ZERO
 var _anim_time: float = 0.0
 var _anim_player: AnimationPlayer = null
+var _attack_anim_timer: float = 0.0
+var _is_attack_animating: bool = false
+
+const ATTACK_ANIM_DURATION: float = 0.22
+const ANIM_IDLE_CANDIDATES := ["Attack Idle", "Idle", "CharacterArmature|Idle"]
+const ANIM_WALK_CANDIDATES := ["Walk", "CharacterArmature|Walk"]
+const ANIM_RUN_CANDIDATES := ["Run", "CharacterArmature|Run"]
+const ANIM_ATTACK_CANDIDATES := ["Attack", "Slash", "CharacterArmature|Punch", "CharacterArmature|Attack"]
 
 @onready var fireball_scene := preload("res://entities/player/weapons/MagicProjectile.tscn")
 @onready var styloo_projectile_scene := preload("res://entities/player/weapons/StylooRangedProjectile.tscn")
@@ -166,6 +173,8 @@ func _physics_process(delta: float) -> void:
 		
 	if is_multiplayer_authority():
 		_update_timers(delta)
+		if _attack_anim_timer > 0.0:
+			_attack_anim_timer = max(_attack_anim_timer - delta, 0.0)
 		_handle_movement(delta)
 		_handle_abilities()
 		_check_fall_death(delta)
@@ -357,7 +366,9 @@ func rpc_spawn_grenade(pos: Vector3, throw_velocity: Vector3) -> void:
 		grenade.initial_velocity = throw_velocity
 
 func _attack_katana() -> void:
-	rpc_execute_katana.rpc(global_position, last_look_dir)
+	var attack_dir := _get_attack_direction()
+	_trigger_attack_animation()
+	rpc_execute_katana.rpc(global_position, attack_dir)
 
 @rpc("any_peer", "call_local")
 func rpc_execute_katana(pos: Vector3, l_dir: Vector3) -> void:
@@ -485,7 +496,7 @@ func _fire_weapon() -> void:
 func _fire_ranged_projectile() -> void:
 	"""Disparar proyectil ranged (shurikens, kunai, hachas)."""
 	# Usar la dirección real hacia donde mira el personaje, pero forzando horizontal como los bots
-	var shoot_dir := _get_look_direction()
+	var shoot_dir := _get_attack_direction()
 	shoot_dir.y = 0 # FORZAR VUELO PARALELO AL SUELO
 	shoot_dir = shoot_dir.normalized()
 	
@@ -499,6 +510,8 @@ func _fire_ranged_projectile() -> void:
 		rpc_id(1, "rpc_request_styloo_projectile", spawn_pos, shoot_dir, _current_styloo_weapon, _current_weapon_data)
 	
 	# AnimaciÃ³n de lanzamiento
+	_trigger_attack_animation()
+	return
 	if _anim_player and _anim_player.has_animation("CharacterArmature|Punch"):
 		_anim_player.play("CharacterArmature|Punch")
 	elif visual_model:
@@ -512,11 +525,13 @@ func _perform_melee_attack() -> void:
 	var weapon_range: float = _current_weapon_data.get("range", 3.0)
 	var weapon_damage: int = _current_weapon_data.get("damage", 40)
 	var weapon_color: Color = _current_weapon_data.get("color", Color.CYAN)
+	var attack_dir := _get_attack_direction()
+	_trigger_attack_animation()
 	
 	if multiplayer.is_server():
-		rpc_execute_styloo_attack.rpc(global_position, last_look_dir, weapon_range, weapon_damage, weapon_color)
+		rpc_execute_styloo_attack.rpc(global_position, attack_dir, weapon_range, weapon_damage, weapon_color)
 	else:
-		rpc_id(1, "rpc_request_styloo_attack", global_position, last_look_dir, weapon_range, weapon_damage, weapon_color)
+		rpc_id(1, "rpc_request_styloo_attack", global_position, attack_dir, weapon_range, weapon_damage, weapon_color)
 
 func _drop_weapon() -> void:
 	"""Drop weapon on the ground when durability runs out."""
@@ -711,13 +726,22 @@ func _animate_visuals(_delta: float) -> void:
 	var speed_ratio = Vector2(velocity.x, velocity.z).length() / move_speed
 	
 	if _anim_player:
-		var target_anim := ""
-		if speed_ratio > 0.1:
-			target_anim = "Walk" if _anim_player.has_animation("Walk") else ("Run" if _anim_player.has_animation("Run") else "")
+		if _attack_anim_timer > 0.0:
+			var attack_anim := _pick_animation(ANIM_ATTACK_CANDIDATES)
+			if attack_anim != "" and _anim_player.current_animation != attack_anim:
+				_anim_player.play(attack_anim)
 		else:
-			target_anim = "Idle" if _anim_player.has_animation("Idle") else ""
-		if target_anim and _anim_player.current_animation != target_anim:
-			_anim_player.play(target_anim)
+			var target_anim := ""
+			if speed_ratio > 0.35:
+				target_anim = _pick_animation(ANIM_RUN_CANDIDATES)
+				if target_anim == "":
+					target_anim = _pick_animation(ANIM_WALK_CANDIDATES)
+			elif speed_ratio > 0.08:
+				target_anim = _pick_animation(ANIM_WALK_CANDIDATES)
+			else:
+				target_anim = _pick_animation(ANIM_IDLE_CANDIDATES)
+			if target_anim != "" and _anim_player.current_animation != target_anim:
+				_anim_player.play(target_anim)
 	
 	# Fallback/Additive procedural animation
 	if speed_ratio > 0.1:
@@ -774,6 +798,51 @@ func _get_ring_material() -> StandardMaterial3D:
 		_init_material_cache()
 	var mat = _ring_material_cache.duplicate()
 	return mat
+
+func _get_attack_direction() -> Vector3:
+	var attack_dir := _get_look_direction()
+	attack_dir.y = 0.0
+	if attack_dir.length() <= 0.001:
+		attack_dir = last_look_dir
+		attack_dir.y = 0.0
+	if attack_dir.length() <= 0.001:
+		attack_dir = Vector3.FORWARD
+	attack_dir = attack_dir.normalized()
+	last_look_dir = attack_dir
+	return attack_dir
+
+func _trigger_attack_animation() -> void:
+	_attack_anim_timer = ATTACK_ANIM_DURATION
+	var attack_anim := _pick_animation(ANIM_ATTACK_CANDIDATES)
+	if _anim_player and attack_anim != "":
+		_anim_player.play(attack_anim)
+	if visual_model:
+		var tw = create_tween()
+		tw.tween_property(visual_model, "scale", _base_scale * 1.16, 0.06)
+		tw.tween_property(visual_model, "scale", _base_scale, 0.16)
+	_animate_weapon_swing()
+
+func _animate_weapon_swing() -> void:
+	if not _weapon_visual:
+		return
+	_is_attack_animating = true
+	var initial_rotation := _weapon_visual.rotation_degrees
+	# Forward slash: blade swings down-forward, edge leads
+	var swing_target := Vector3(-85.0, 0.0, 0.0)
+	var tw_weapon = create_tween()
+	tw_weapon.tween_property(_weapon_visual, "rotation_degrees", swing_target, 0.08)
+	tw_weapon.tween_property(_weapon_visual, "rotation_degrees", initial_rotation, 0.15)
+	tw_weapon.finished.connect(func():
+		_is_attack_animating = false
+	)
+
+func _pick_animation(candidates: Array) -> String:
+	if not _anim_player:
+		return ""
+	for candidate in candidates:
+		if _anim_player.has_animation(candidate):
+			return candidate
+	return ""
 
 func _play_shoot_sound() -> void:
 	# Cachear AudioManager para evitar get_node_or_null repetido
@@ -958,17 +1027,17 @@ func _setup_styloo_weapon_visual() -> void:
 			# Otros objetos minúsculos: reducido 50% (1350x)
 			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 675.0
 			_weapon_visual.position = Vector3(0.15, 0.55, 0.25)
-			_weapon_visual.rotation_degrees = Vector3(0, 90, 90)
+			_weapon_visual.rotation_degrees = Vector3(-90, 90, 90)
 		elif is_sword_katana:
 			# Espadas y katanas: Reducidas un 50% según el usuario (450x del base 0.008)
 			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 450.0
-			_weapon_visual.position = Vector3(0.25, 0.6, 0.35)
-			_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
+			_weapon_visual.position = Vector3(0.2, 0.6, 0.4)
+			_weapon_visual.rotation_degrees = Vector3(0, 90, 0)  # Vertical, edge forward
 		else:
 			# Otros (hachas, picos): Reducido 50% (450x)
 			_weapon_visual.scale = Vector3(0.008, 0.008, 0.008) * 450.0
 			_weapon_visual.position = Vector3(0.25, 0.6, 0.35)
-			_weapon_visual.rotation_degrees = Vector3(0, 90, 0)
+			_weapon_visual.rotation_degrees = Vector3(-90, 90, 0)
 		# Aplicar la textura correcta
 		_apply_weapon_materials_to_node(_weapon_visual)
 		

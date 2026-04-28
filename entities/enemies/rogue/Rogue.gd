@@ -19,6 +19,10 @@ func _ready() -> void:
 	# IA mÃ¡s agresiva
 	flank_chance = 0.5  # 50% probabilidad de flanquear
 	reaction_time = 0.2  # Reacciona mÃ¡s rÃ¡pido
+	move_speed = 8.2
+	reaction_time = 0.12
+	attack_cooldown = 0.65
+	max_distance_from_player = 90.0
 	_find_anim_player()
 	_setup_daggers_visual()
 	_setup_glow()  # VISUAL: Glow effect for miniboss
@@ -82,23 +86,28 @@ func _physics_process(delta: float) -> void:
 func _move_while_attacking(delta: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-	
-	# Movimiento del 50% de velocidad mientras ataca melee
+
 	var to_target = target.global_position - global_position
 	var move_dir = Vector3(to_target.x, 0, to_target.z).normalized()
 	var dist = global_position.distance_to(target.global_position)
-	
-	# Sigue persiguiendo mientras ataca
-	if dist > attack_range * 0.8:
-		# Acércate al target
-		velocity = move_dir * move_speed * 0.5
-	elif dist < attack_range * 0.5:
-		# Un pequeño paso atrás para mantener el ritmo de ataque
-		velocity = -move_dir * move_speed * 0.2
+	var strafe_dir = move_dir.cross(Vector3.UP).normalized()
+	if strafe_dir == Vector3.ZERO:
+		strafe_dir = Vector3.RIGHT
+
+	# Rogue persigue activamente mientras ataca - nunca quieto
+	if dist > attack_range * 0.9:
+		# Persigue con fuerza
+		velocity = move_dir * move_speed * 0.9
+	elif dist < attack_range * 0.45:
+		# Un poco atrás
+		velocity = (-move_dir + strafe_dir * 0.4) * move_speed * 0.55
 	else:
-		# Strafe mientras ataca
-		var strafe = move_dir.cross(Vector3.UP) * (1 if randf() > 0.5 else -1)
-		velocity = strafe * move_speed * 0.3
+		# Strafe activo
+		var strafe_sign = 1.0 if sin(Time.get_ticks_msec() * 0.006) >= 0.0 else -1.0
+		velocity = (move_dir * 0.45 + strafe_dir * strafe_sign) * move_speed * 0.75
+	
+	if move_dir.length() > 0.01:
+		rotation.y = lerp_angle(rotation.y, atan2(move_dir.x, move_dir.z), 12.0 * delta)
 
 func _update_animation() -> void:
 	if not _anim_player:

@@ -3,7 +3,7 @@ extends EnemyBase
 ## Ranger â€” usa Skeleton_Rogue.glb (KayKit Skeletons) + Crossbow
 
 # El attack_cooldown ahora se hereda de EnemyBase
-var projectile_scene := preload("res://entities/player/weapons/Projectile.tscn")
+# projectile_scene ahora se hereda de EnemyBase
 
 var _anim_player: AnimationPlayer = null
 const ANIM_WALK := "Walk"
